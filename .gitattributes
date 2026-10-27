@@ -1,1 +1,3 @@
 * text=auto eol=lf
+# Unified diff context contains required single-space lines; validate with git apply.
+compat/harness/*.patch -whitespace

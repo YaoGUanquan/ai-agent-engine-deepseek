@@ -1,0 +1,1411 @@
+diff --git a/docs/architecture.md b/docs/architecture.md
+index 03d8814..a91badb 100644
+--- a/docs/architecture.md
++++ b/docs/architecture.md
+@@ -105,7 +105,7 @@ turn/end
+ 
+ `turn/*`, `step/*`, `system/message`, `user/message`, `assistant/message`, `assistant/attempt`, and `tool/*` are durable session events; the rest are live extension points across three domains. `agent/assistant-stream` publishes process-local start, transient chunk, and end frames. The loop commits the complete compact stream as one message or log-only attempt before a committed end frame, and the Web Session-follow adapter is the live event's only remote consumer. `agent/pre-step`, `agent/request`, `llm/stream`, and the three `tools/*` events are waterfalls, whose listeners must call `next()` to delegate; `agent/turn-stopping` is serial and has no `next()`.
+ 
+-One inbox feeds the driver; injected context waits for a waking message. AgentLoop’s durable `inbox` projection exposes pending input without live Agents.
++One inbox feeds the driver; injected context waits for a waking message. AgentLoop’s durable `inbox` projection exposes pending input without live Agents. Permanent-deletion reservations refuse new inbox entries before quiescence; removals and lifecycle maintenance remain allowed so cancellation can drain pending input and release resources.
+ 
+ `agent/pre-step` decides the accepted input. Listeners may rewrite or reject claimed messages; a rejected or empty first claim closes a durable turn without a step. An enter decision may set `startsRequestSeries`: the loop logs a fresh `request/header` (reason `series`, or `change` with `startsSeries: true` when the envelope also changed). Wrapping listeners preserve that declaration with `{ ...decision, messages }`. After assembly and `step/start`, `agent/request` and `prepareCall()` resolve the actual route before the system prompt and accepted users are committed; cancellation during either async phase commits neither. Prepared call capabilities govern prompt admission, not preceding `request/context`. Each attempt refreshes registered runtime facts, reconciles the bound prompt, admits users once, and restores removed runtime context, logs header/context as needed, and freezes the request before streaming the bound call. Retries do not repeat assembly or `agent/pre-step`. Surface replacements and image-offload decisions after attachment start a new request series, including during the first resumed pre-step; unchanged resume continues the series. The first admitted step reserves the system head before user messages even for an empty prompt (no wire message). The prompt travels only as `system/message` history: an empty rendering clears all active system nodes, leaving no old prompt model-visible; capable routes append non-empty updates after cached history, including supported tool updates; incapable routes and new request series consolidate non-empty prompt text at the first system node, with logged empty replacements for non-empty later system nodes ([decision](../.agents/notes/implemented/architecture/2026-09-02-system-prompt-as-surface-node.md); [decision rule](../packages/core/agent-loop/README.md#understand-the-implementation)).
+ 
+diff --git a/packages/core/agent-loop/src/agent.ts b/packages/core/agent-loop/src/agent.ts
+index adf2e33..2fb7ef3 100644
+--- a/packages/core/agent-loop/src/agent.ts
++++ b/packages/core/agent-loop/src/agent.ts
+@@ -129,7 +129,7 @@ export class ReactLoopAgent implements Agent {
+     this.dispatch = agentEvents(loopCtx, this)
+     this.scope = createScope(loopCtx, this)
+     this.ctx = this.scope.ctx
+-    this.inbox = new ReactLoopInbox(this.ctx.sessionProjections, session, this.dispatch)
++    this.inbox = new ReactLoopInbox(this.ctx.sessionProjections, session, this.dispatch, this.ctx.sessions)
+     /* v8 ignore next -- the loop registers its own turnBoundary unit, so the key is always present */
+     const lastTurn = this.loopCtx.sessionProjections.stateOf(session, 'turnBoundary')?.lastTurn ?? 0
+     this.phase = { kind: 'idle', lastTurn }
+diff --git a/packages/core/agent-loop/src/inbox.ts b/packages/core/agent-loop/src/inbox.ts
+index ef00887..c1757c4 100644
+--- a/packages/core/agent-loop/src/inbox.ts
++++ b/packages/core/agent-loop/src/inbox.ts
+@@ -8,6 +8,7 @@ import type { MessageId } from '@deepseek-ai/dsh-llm'
+ import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection'
+ import type SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
+ import type { Session, SessionEventMap, UserMessage } from '@deepseek-ai/dsh-session'
++import type SessionStore from '@deepseek-ai/dsh-session'
+ import type {
+   AgentEventDispatch,
+   Inbox as InboxContract,
+@@ -70,12 +71,14 @@ export const inboxProjectionDefinition = {
+  * @param projections - registry with the standard Inbox projection registered by AgentLoop.
+  * @param session - session whose durable events store pending input.
+  * @param dispatch - agent-scoped notifications for Inbox lifecycle events.
++ * @param sessions - owner of input admission during permanent deletion.
+  */
+ export class ReactLoopInbox implements InboxContract {
+   constructor(
+     private readonly projections: SessionProjectionRegistry,
+     private readonly session: Session,
+     private readonly dispatch: AgentEventDispatch,
++    private readonly sessions: SessionStore,
+   ) {}
+ 
+   /** Prompts awaiting individual turns. */
+@@ -202,6 +205,7 @@ export class ReactLoopInbox implements InboxContract {
+     inserted: UserMessage[],
+     discardRemoved: boolean,
+   ): UserMessage[] {
++    if (inserted.length > 0) this.sessions.assertDeletionAdmission(this.session.id)
+     const state = this.current()
+     const inbox = state[target]
+     const truncatedStart = Math.trunc(start)
+diff --git a/packages/core/agent-loop/tests/inbox.spec.ts b/packages/core/agent-loop/tests/inbox.spec.ts
+index 739d18b..359fc3c 100644
+--- a/packages/core/agent-loop/tests/inbox.spec.ts
++++ b/packages/core/agent-loop/tests/inbox.spec.ts
+@@ -52,7 +52,7 @@ async function inboxAgent(rawId: string): Promise<{
+   ctx.sessionProjections.register(inboxProjectionDefinition)
+   const session = ctx.sessions.create(SessionId(rawId))
+   const agent = stubAgent(rawId, { ctx, session })
+-  const inbox = new ReactLoopInbox(ctx.sessionProjections, session, agentEvents(ctx, agent))
++  const inbox = new ReactLoopInbox(ctx.sessionProjections, session, agentEvents(ctx, agent), ctx.sessions)
+   Object.assign(agent, { inbox })
+   return { ctx, session, agent, inbox }
+ }
+@@ -69,7 +69,7 @@ async function reconstructPersistedInbox(
+   await ctx.plugin(SessionProjectionRegistry)
+   ctx.sessionProjections.register(inboxProjectionDefinition)
+   const agent = stubAgent(rawId, { ctx, session })
+-  const inbox = new ReactLoopInbox(ctx.sessionProjections, session, agentEvents(ctx, agent))
++  const inbox = new ReactLoopInbox(ctx.sessionProjections, session, agentEvents(ctx, agent), ctx.sessions)
+   try {
+     void inbox.nextTurn
+   } catch (error: unknown) {
+@@ -80,6 +80,23 @@ async function reconstructPersistedInbox(
+ }
+ 
+ describe('ReactLoopInbox', () => {
++  it('rejects new input and owned children during deletion while permitting cancellation and independent work', async () => {
++    const { ctx, session, inbox } = await inboxAgent('deleting')
++    const message = createUserMessage({ content: [{ type: 'text', text: 'pending' }], source: { kind: 'user' } })
++    inbox.append('next-turn', message)
++    const release = ctx.sessions.reserveDeletion([session.id])
++    expect(() => inbox.append('next-turn', message)).toThrow('reserved for permanent deletion')
++    expect(() => ctx.sessions.prepare(SessionId('late-child'), { meta: { parentSession: session.id } }))
++      .toThrow('reserved for permanent deletion')
++    expect(() => ctx.sessions.prepare(session.id)).toThrow('reserved for permanent deletion')
++    expect(() => ctx.sessions.prepare(SessionId('unrelated'))).not.toThrow()
++    inbox.clear()
++    expect(inbox.hasPending).toBe(false)
++    release()
++    inbox.append('next-turn', message)
++    expect(inbox.nextTurn).toEqual([message])
++  })
++
+   it('reads the shared projection without owning its registration', async () => {
+     const ctx = new Context()
+     onTestFinished(() => ctx.fiber.dispose())
+@@ -96,8 +113,8 @@ describe('ReactLoopInbox', () => {
+     })
+     const agent = stubAgent('inbox-projection', { ctx, session })
+     const dispatch = agentEvents(ctx, agent)
+-    const first = new ReactLoopInbox(ctx.sessionProjections, session, dispatch)
+-    const second = new ReactLoopInbox(ctx.sessionProjections, session, dispatch)
++    const first = new ReactLoopInbox(ctx.sessionProjections, session, dispatch, ctx.sessions)
++    const second = new ReactLoopInbox(ctx.sessionProjections, session, dispatch, ctx.sessions)
+ 
+     expect(first.nextTurn).toEqual([pending])
+     expect(second.nextTurn).toEqual([pending])
+@@ -144,7 +161,7 @@ describe('ReactLoopInbox', () => {
+     ctx.sessionProjections.register(inboxProjectionDefinition)
+     const parent = ctx.sessions.create(SessionId('inbox-fork-parent'))
+     const parentAgent = stubAgent('inbox-fork-parent', { ctx, session: parent })
+-    const parentInbox = new ReactLoopInbox(ctx.sessionProjections, parent, agentEvents(ctx, parentAgent))
++    const parentInbox = new ReactLoopInbox(ctx.sessionProjections, parent, agentEvents(ctx, parentAgent), ctx.sessions)
+     const inherited = createUserMessage({
+       content: [{ type: 'text', text: 'parent pending' }],
+       source: { kind: 'user' },
+@@ -152,7 +169,7 @@ describe('ReactLoopInbox', () => {
+     parentInbox.append('next-turn', inherited)
+     const child = ctx.sessions.fork(parent, undefined, SessionId('inbox-fork-child'))
+     const childAgent = stubAgent('inbox-fork-child', { ctx, session: child })
+-    const childInbox = new ReactLoopInbox(ctx.sessionProjections, child, agentEvents(ctx, childAgent))
++    const childInbox = new ReactLoopInbox(ctx.sessionProjections, child, agentEvents(ctx, childAgent), ctx.sessions)
+ 
+     expect(child.inheritedEventCount).toBe(parent.snapshotEvents().length)
+     expect(childInbox.nextTurn).toEqual([inherited])
+diff --git a/packages/core/agent/src/index.ts b/packages/core/agent/src/index.ts
+index dd8d09e..20a865d 100644
+--- a/packages/core/agent/src/index.ts
++++ b/packages/core/agent/src/index.ts
+@@ -244,6 +244,7 @@ interface FactorySlot {
+  */
+ export class AgentRegistry extends Service {
+   private store = new Map<SessionId, AgentEntry>()
++  private readonly deletionHandles = new Map<SessionId, AgentHandle>()
+   private factory: FactorySlot | undefined
+   private readonly initiators = new AsyncLocalStorage<Agent | undefined>()
+   private readonly initiatorRuns = new AsyncLocalStorage<InitiatorRun>()
+@@ -254,6 +255,7 @@ export class AgentRegistry extends Service {
+ 
+   constructor(ctx: Context) {
+     super(ctx, 'agents')
++    ctx.on('agent/disposed', ({ agent }) => { this.deletionHandles.delete(agent.id) })
+     ctx.inject(['typert'], (typeCtx) => {
+       typeCtx.typert.lookups.register('agent', {
+         parameter: 'agent',
+@@ -399,7 +401,9 @@ export class AgentRegistry extends Service {
+     const { target } = this.requireFactory()
+     const receiver = getTraceable(ownerCtx, target)
+     // oxlint-disable-next-line typescript/unbound-method -- Reflect.apply intentionally supplies the caller-traced receiver
+-    return Reflect.apply(target.createAgent, receiver, [ownerCtx, options])
++    const handle = await Reflect.apply(target.createAgent, receiver, [ownerCtx, options])
++    this.deletionHandles.set(handle.agent.id, handle)
++    return handle
+   }
+ 
+   /**
+@@ -414,7 +418,22 @@ export class AgentRegistry extends Service {
+     const { target } = this.requireFactory()
+     const receiver = getTraceable(ownerCtx, target)
+     // oxlint-disable-next-line typescript/unbound-method -- Reflect.apply intentionally supplies the caller-traced receiver
+-    return Reflect.apply(target.resume, receiver, [ownerCtx, options])
++    const handle = await Reflect.apply(target.resume, receiver, [ownerCtx, options])
++    this.deletionHandles.set(handle.agent.id, handle)
++    return handle
++  }
++
++  /**
++   * Drain a factory-owned Agent before an owner-authorized permanent deletion.
++   * @param id - Session identity already reserved against new publication.
++   * @returns resolution after the exact Agent's lifecycle has stopped.
++   */
++  async disposeForDeletion(id: SessionId): Promise<void> {
++    const agent = this.get(id)
++    if (agent === undefined) return
++    const handle = this.deletionHandles.get(id)
++    if (handle?.agent !== agent) throw new Error('Agent lifecycle does not support permanent deletion')
++    await handle.dispose()
+   }
+ 
+   /**
+diff --git a/packages/core/session/src/index.ts b/packages/core/session/src/index.ts
+index e1ecb92..3dab524 100644
+--- a/packages/core/session/src/index.ts
++++ b/packages/core/session/src/index.ts
+@@ -1047,6 +1047,29 @@ export class SessionForkError extends Error {
+  * a session published outside that lifecycle persists nothing.
+  */
+ export class SessionStore extends Service {
++  private readonly deleting = new Set<SessionId>()
++
++  /**
++   * Reserve exact identities against publication and creation of owned children.
++   * @param ids - Session tree selected by the owner deletion operation.
++   * @returns a disposer releasing this reservation.
++   */
++  reserveDeletion(ids: readonly SessionId[]): () => void {
++    if (ids.some(id => this.deleting.has(id))) throw new Error('Session deletion already in progress')
++    for (const id of ids) this.deleting.add(id)
++    return () => { for (const id of ids) this.deleting.delete(id) }
++  }
++
++  /**
++   * Refuse new work and owned-child publication for reserved identities.
++   * @param id - Session accepting the work.
++   * @param parent - owning parent when publishing a child.
++   */
++  assertDeletionAdmission(id: SessionId, parent?: SessionId): void {
++    if (this.deleting.has(id) || (parent !== undefined && this.deleting.has(parent))) {
++      throw new Error('Session is reserved for permanent deletion')
++    }
++  }
+   private store = new Map<SessionId, SessionEntry>()
+   private counter = 0
+   private readonly projections: SessionMessageProjection[] = []
+@@ -1148,6 +1171,7 @@ export class SessionStore extends Service {
+     } else {
+       sessionId = brandString<SessionId>(id)
+     }
++    this.assertDeletionAdmission(sessionId, options?.meta?.parentSession)
+     if (this.store.has(sessionId)) throw new Error(`session "${sessionId}" already exists`)
+     if (options !== undefined) {
+       const { eventState } = options
+@@ -1209,6 +1233,7 @@ export class SessionStore extends Service {
+    */
+   enter(session: Session): () => void {
+     const id = session.id
++    this.assertDeletionAdmission(id, session.header.parentSession)
+     const carrier = scopeTarget(session, scopeOf(this.ctx))
+     // This is the authoritative collision boundary after arbitrary unpublished
+     // preparation. Only one exact same-id transaction can publish.
+diff --git a/packages/session/session-persistence/src/index.ts b/packages/session/session-persistence/src/index.ts
+index f257ca0..60273a9 100644
+--- a/packages/session/session-persistence/src/index.ts
++++ b/packages/session/session-persistence/src/index.ts
+@@ -135,6 +135,23 @@ declare module '@deepseek-ai/cordis' {
+  * on this backend instance observe at least that prefix.
+  */
+ export abstract class SessionPersistence extends Service {
++  /** Whether this backend implements durable, writer-exclusive permanent deletion. */
++  get deletionSupported(): boolean { return false }
++
++  /**
++   * Read durable deletion identities, including operations awaiting cleanup.
++   * @returns identifiers that must never be recreated or resumed.
++   */
++  deletedSessionIds(): Promise<readonly SessionId[]> { return Promise.resolve([]) }
++
++  /**
++   * Permanently remove an owner-selected, quiescent Session tree.
++   * @param headers - exact identities and storage locations selected by the owner.
++   * @returns resolution after physical cleanup; repeated calls resume cleanup.
++   */
++  deleteSessions(_headers: readonly SessionHeader[]): Promise<void> {
++    return Promise.reject(new Error('Session persistence does not support permanent deletion'))
++  }
+   /** Process-local instance identity, stable through Context proxies and distinct after service replacement. */
+   readonly identity: symbol = Symbol('sessionPersistence')
+ 
+diff --git a/packages/session/session-persistence-jsonl/src/index.ts b/packages/session/session-persistence-jsonl/src/index.ts
+index 3c3c135..6819790 100644
+--- a/packages/session/session-persistence-jsonl/src/index.ts
++++ b/packages/session/session-persistence-jsonl/src/index.ts
+@@ -6,7 +6,7 @@
+  * @module @deepseek-ai/dsh-session-persistence-jsonl
+  */
+ 
+-import { Context, type Fiber } from '@deepseek-ai/cordis'
++import { Context, Service, type Fiber } from '@deepseek-ai/cordis'
+ import z from '@deepseek-ai/schemastery'
+ import {
+   createSessionFormatCatalogWithChildren,
+@@ -34,6 +34,7 @@ import {
+ } from '@deepseek-ai/dsh-session-persistence'
+ import { JsonlBackendTracker, JsonlSessionHandle, type StorageHandleState } from './storage.ts'
+ import { SessionWriteLease } from './lease.ts'
++import { JsonlDeletionJournal, DELETION_LOCK_DIRECTORY } from './deletion.ts'
+ import { SESSION_FORMAT_VERSION, SessionId as makeSessionId, SessionLogOffset } from '@deepseek-ai/dsh-session'
+ import type { SessionEvent, SessionId, SessionHeader, SessionLogOffset as SessionLogOffsetType } from '@deepseek-ai/dsh-session'
+ import {
+@@ -289,6 +290,36 @@ function waitWithAbort<T>(operation: Promise<T>, signal?: AbortSignal): Promise<
+  * flush, and never existed if the process crashes before that.
+  */
+ class JsonlSessionPersistence extends SessionPersistence {
++  private readonly deletions: JsonlDeletionJournal
++
++  override get deletionSupported(): boolean { return true }
++
++  protected async [Service.init](): Promise<void> {
++    await this.deletions.recover()
++  }
++
++  override async deletedSessionIds(): Promise<readonly SessionId[]> {
++    return (await this.deletions.records()).map(record => record.id)
++  }
++
++  /** Refuse old open handles after a durable deletion commit. */
++  assertReadable(id: SessionId): Promise<void> {
++    return this.deletions.assertReadable(id)
++  }
++
++  override async deleteSessions(headers: readonly SessionHeader[]): Promise<void> {
++    const claimed: SessionId[] = []
++    try {
++      for (const header of headers) {
++        this.tracker.claimWrite(header.id)
++        claimed.push(header.id)
++      }
++      await this.deletions.remove(headers)
++      for (const header of headers) this.coldLogMemo.delete(header.id)
++    } finally {
++      for (const id of claimed) this.tracker.releaseClaim(id)
++    }
++  }
+   /** Backend label for diagnostics and effects; shadows `Service.name` without changing the service key. */
+   override readonly name = 'session-persistence-jsonl'
+ 
+@@ -324,6 +355,7 @@ class JsonlSessionPersistence extends SessionPersistence {
+     }
+     // Resolve once so later process.cwd() changes cannot split one backend across roots.
+     this.root = resolve(config.root)
++    this.deletions = new JsonlDeletionJournal(this.root)
+     this.compression = config.compression ?? DEFAULT_COMPRESSION
+     this.listLimit = pLimit(config.listConcurrency ?? DEFAULT_LIST_CONCURRENCY)
+     this.generationFormat = {
+@@ -360,6 +392,7 @@ class JsonlSessionPersistence extends SessionPersistence {
+   async create(header: SessionHeader, options?: SessionPersistenceCreateOptions): Promise<SessionHandle> {
+     options?.signal?.throwIfAborted()
+     const snapshot = materializeCreateHeader(header)
++    await this.assertReadable(snapshot.id)
+     // Fail fast on a seeded/cut mismatch with the exact refusal the header
+     // line encoder enforces at materialization.
+     toHeaderLine(snapshot, options?.inheritedEventCount)
+@@ -387,6 +420,7 @@ class JsonlSessionPersistence extends SessionPersistence {
+    */
+   async open(id: SessionId, access: SessionAccess, options?: SessionPersistenceOpenOptions): Promise<SessionHandle> {
+     options?.signal?.throwIfAborted()
++    await this.assertReadable(id)
+     await this.ensureRootEncoding()
+     options?.signal?.throwIfAborted()
+     const pending = this.tracker.pendingOf(id)
+@@ -426,6 +460,7 @@ class JsonlSessionPersistence extends SessionPersistence {
+       const resolved = await this.findLog(id, options?.signal)
+       if (resolved === undefined) throw new SessionPersistenceNotFoundError(id)
+       lease = await this.acquireLease(id, undefined, dirname(resolved.currentPath))
++      await this.assertReadable(id)
+       const prepared = await this.requireStoredLog(id, options?.signal)
+       options?.signal?.throwIfAborted()
+       let stored: CurrentStoredLog
+@@ -485,6 +520,7 @@ class JsonlSessionPersistence extends SessionPersistence {
+     options?: SessionPersistenceStatOptions,
+   ): Promise<SessionPersistenceSnapshot | undefined> {
+     options?.signal?.throwIfAborted()
++    if ((await this.deletedSessionIds()).includes(id)) return undefined
+     await this.ensureRootEncoding()
+     options?.signal?.throwIfAborted()
+     const pending = this.tracker.pendingOf(id)
+@@ -558,7 +594,8 @@ class JsonlSessionPersistence extends SessionPersistence {
+       if (!listed.has(id)) snapshots.push({ header: entry.header, revision: entry.revision })
+     }
+     signal?.throwIfAborted()
+-    return snapshots
++    const deleted = new Set(await this.deletedSessionIds())
++    return snapshots.filter(snapshot => !deleted.has(snapshot.header.id))
+   }
+ 
+   // --- handle-facing storage internals (package-private via the handle class below) ---
+@@ -985,7 +1022,14 @@ class JsonlSessionPersistence extends SessionPersistence {
+     // Refuse an opposite-encoding artifact before the lock's mkdir publishes
+     // the session directory — the last moment the directory can be absent.
+     await this.rejectOppositeArtifact(header.cwd, header.id)
+-    return this.acquireLease(header.id, header.cwd)
++    const lease = await this.acquireLease(header.id, header.cwd)
++    try {
++      await this.assertReadable(header.id)
++      return lease
++    } catch (error: unknown) {
++      await lease.release()
++      throw error
++    }
+   }
+ 
+   /** Decode complete frames and retain complete JSONL records from a torn final frame. */
+@@ -1671,7 +1715,7 @@ class JsonlSessionPersistence extends SessionPersistence {
+       signal?.throwIfAborted()
+       const entries = await readdir(this.root, { withFileTypes: true })
+       signal?.throwIfAborted()
+-      return entries.filter(e => e.isDirectory()).map(e => join(this.root, e.name))
++      return entries.filter(e => e.isDirectory() && e.name !== DELETION_LOCK_DIRECTORY).map(e => join(this.root, e.name))
+     } catch (error) {
+       // Only an absent root means no sessions; rethrow every other I/O failure.
+       if (isENOENT(error)) return []
+diff --git a/packages/session/session-persistence-jsonl/src/storage.ts b/packages/session/session-persistence-jsonl/src/storage.ts
+index 197dcbc..41b28b5 100644
+--- a/packages/session/session-persistence-jsonl/src/storage.ts
++++ b/packages/session/session-persistence-jsonl/src/storage.ts
+@@ -37,6 +37,8 @@ export const LIVE_WRITE_BATCH_MAX_DELAY_MS = 200
+ 
+ /** The file-storage primitives the handle drives on its owning service. */
+ export interface JsonlHandleStorage {
++  /** Reject handles whose transcript was permanently deleted. */
++  assertReadable(id: SessionId): Promise<void>
+   /** Append encoded lines; `isMaterialized` selects create-vs-extend publication. */
+   persistBatch(
+     header: SessionHeader,
+@@ -119,6 +121,7 @@ export class JsonlSessionHandle implements SessionHandle {
+     // Closed-handle refusal precedes argument validation: a closed handle
+     // rejects SessionHandleClosedError regardless of the arguments.
+     this.assertOpen('read')
++    await this.storage.assertReadable(this.id)
+     if (!Number.isSafeInteger(offset) || offset < 0) {
+       throw new TypeError(`read offset must be a non-negative safe integer, got ${String(offset)}`)
+     }
+diff --git a/packages/session/session-persistence-jsonl/tests/jsonl.spec.ts b/packages/session/session-persistence-jsonl/tests/jsonl.spec.ts
+index 760aaa4..a79f14b 100644
+--- a/packages/session/session-persistence-jsonl/tests/jsonl.spec.ts
++++ b/packages/session/session-persistence-jsonl/tests/jsonl.spec.ts
+@@ -1227,7 +1227,7 @@ describe('JsonlSessionPersistence: immutable format generations', () => {
+       })
+       const [listed] = await ctx.sessionPersistence.list()
+       expect(listed?.formatStatus).toBe(formatStatus)
+-      expect(readTally.bySuffix.size).toBe(0)
++      expect([...readTally.bySuffix.keys()].filter(path => path.endsWith('.jsonl') || path.endsWith('.jsonl.zstd'))).toEqual([])
+     }
+   })
+ 
+diff --git a/packages/session/session-projection-cache/src/index.ts b/packages/session/session-projection-cache/src/index.ts
+index 34726fc..a490d8e 100644
+--- a/packages/session/session-projection-cache/src/index.ts
++++ b/packages/session/session-projection-cache/src/index.ts
+@@ -108,6 +108,22 @@ export class SessionProjectionCache extends Service {
+ 
+   private table?: KvTable<SessionId, CheckpointRecord>
+   private readonly dirty = new Map<Session, DirtyState>()
++  private readonly forgotten = new Set<SessionId>()
++
++  /**
++   * Remove deleted-session checkpoints and fence delayed write-behind work.
++   * @param ids - identities whose transcript deletion has committed.
++   */
++  async forgetSessions(ids: readonly SessionId[]): Promise<void> {
++    for (const id of ids) this.forgotten.add(id)
++    for (const [session] of this.dirty) {
++      if (this.forgotten.has(session.id)) {
++        this.markClean(session)
++        this.dirty.delete(session)
++      }
++    }
++    for (const id of ids) await this.requireTable().delete(id)
++  }
+ 
+   constructor(ctx: Context, public config: Config) {
+     super(ctx, 'sessionProjectionCache')
+@@ -118,6 +134,8 @@ export class SessionProjectionCache extends Service {
+     const domain = await this.ctx.storageDomain.open(projectionCacheDomainSpec)
+     this.ctx.effect(() => () => domain.close(), 'sessionProjectionCache.domainClose')
+     this.table = domain.table('sessions')
++    const persistence = this.ctx.get('sessionPersistence')
++    if (persistence?.deletionSupported) await this.forgetSessions(await persistence.deletedSessionIds())
+     this.installWritePath()
+   }
+ 
+@@ -387,6 +405,7 @@ export class SessionProjectionCache extends Service {
+ 
+   /** Replace one session's stored record with its log identity and a detached snapshot of `rows`. */
+   private async put(id: SessionId, identity: CheckpointIdentity, rows: ProjectionCheckpoint): Promise<void> {
++    if (this.forgotten.has(id)) return
+     const detached = snapshotJsonValue(rows)
+     if (detached === undefined) {
+       throw new TypeError('projection checkpoint is not losslessly JSON-serializable (a unit state violates the plain-JSON contract)')
+diff --git a/packages/session-query/session-query/src/index.ts b/packages/session-query/session-query/src/index.ts
+index 838ce4c..ad8b0b4 100644
+--- a/packages/session-query/session-query/src/index.ts
++++ b/packages/session-query/session-query/src/index.ts
+@@ -96,6 +96,11 @@ declare module '@deepseek-ai/cordis' {
+  * generations, and query execution on the same `ctx.sessionQuery` service.
+  */
+ export abstract class SessionQueryEngine extends Service {
++  /**
++   * Remove committed deletion identities from a provider-owned search index.
++   * @param _ids - permanently removed Session identities.
++   */
++  reconcileDeletedSessions(_ids: readonly SessionId[]): Promise<void> { return Promise.resolve() }
+   static inject = ['sessions']
+ 
+   private readonly _readWindowMax: number
+diff --git a/packages/session-query/session-query-sqlite/src/index.ts b/packages/session-query/session-query-sqlite/src/index.ts
+index 7c95afa..8396926 100644
+--- a/packages/session-query/session-query-sqlite/src/index.ts
++++ b/packages/session-query/session-query-sqlite/src/index.ts
+@@ -244,7 +244,7 @@ export class SqliteSessionQueryEngine extends SessionQueryEngine {
+     // register `ctx.sessionQuery`; keep that same validated value afterward.
+     super(ctx, config = resolveConfig(config))
+     this.config = config as ResolvedConfig
+-    this._optionalPersistenceFiber = ctx.inject(['sessionPersistence'], (childCtx: Context) => {
++    this._optionalPersistenceFiber = ctx.inject(['sessionPersistence'], async (childCtx: Context) => {
+       const service = childCtx.sessionPersistence
+       const binding = { identity: Symbol(), service }
+       this._persistenceBinding = binding
+@@ -253,6 +253,10 @@ export class SqliteSessionQueryEngine extends SessionQueryEngine {
+         if (this._persistenceBinding !== binding) return
+         this._persistenceBinding = { identity: Symbol() }
+       }, 'sessionQuerySqlite.persistenceBinding')
++      if (service.deletionSupported) {
++        const deleted = await service.deletedSessionIds()
++        if (deleted.length > 0) await this.reconcileDeletedSessions(deleted)
++      }
+     })
+     ctx.effect(() => {
+       return () => this._optionalPersistenceFiber.dispose()
+@@ -293,6 +297,29 @@ export class SqliteSessionQueryEngine extends SessionQueryEngine {
+     })
+   }
+ 
++  /** Remove only confirmed identities without reading other transcripts. */
++  override async reconcileDeletedSessions(ids: readonly SessionId[]): Promise<void> {
++    await this._serialized(undefined, async () => {
++      await this._ensureReady(undefined)
++      const db = this._requireDb()
++      db.exec('BEGIN IMMEDIATE')
++      try {
++        for (const id of ids) {
++          this._deleteSession('persisted', id)
++          this._deleteSession('live', id)
++        }
++        db.prepare('UPDATE search_state SET global_generation = global_generation + 1 WHERE singleton = 1').run()
++        db.exec('COMMIT')
++      } catch (error: unknown) {
++        try { db.exec('ROLLBACK') } catch {
++          // Preserve the original cleanup failure when SQLite also rejects rollback.
++        }
++        throw error
++      }
++      this._globalGeneration += 1
++    })
++  }
++
+   override async searchEvents(
+     request: SessionEventSearchRequest,
+     exec?: SessionSearchExecContext,
+diff --git a/packages/session-query/session-query-sqlite/tests/sqlite.spec.ts b/packages/session-query/session-query-sqlite/tests/sqlite.spec.ts
+index 122dc36..1355e5b 100644
+--- a/packages/session-query/session-query-sqlite/tests/sqlite.spec.ts
++++ b/packages/session-query/session-query-sqlite/tests/sqlite.spec.ts
+@@ -212,6 +212,58 @@ async function liveContext(config: ConstructorParameters<typeof SqliteSessionQue
+ }
+ 
+ describe('SQLite session search', () => {
++  it('cleans committed identities with search disabled without reading unrelated transcripts', async () => {
++    const path = await temporaryPath('deletion.db')
++    const removed = header('removed')
++    const retained = header('retained')
++    TestPersistence.reset([
++      { meta: removed, events: messageEvents('deletionneedle') },
++      { meta: retained, events: messageEvents('retainedneedle') },
++    ])
++    const indexed = await liveContext({ path })
++    await indexed.plugin(TestPersistence)
++    expect((await indexed.sessionQuery.searchSessions({ query: 'deletionneedle' })).items).toHaveLength(1)
++    await indexed.fiber.dispose()
++    TestPersistence.entries.delete(removed.id)
++    TestPersistence.reads.clear()
++    const disabled = await liveContext({ path, openAt: 'never' })
++    await disabled.plugin(TestPersistence)
++    await disabled.sessionQuery.reconcileDeletedSessions([removed.id])
++    expect(TestPersistence.reads.size).toBe(0)
++    expect(TestPersistence.listSignals).toHaveLength(2)
++    await disabled.fiber.dispose()
++    const db = new DatabaseSync(path)
++    try {
++      expect(db.prepare('SELECT id FROM persisted_sessions ORDER BY id').all()).toEqual([{ id: retained.id }])
++    } finally { db.close() }
++  })
++
++  it('recovers a committed deletion left in the index before any search after restart', async () => {
++    const path = await temporaryPath('deletion-recovery.db')
++    const removed = header('crashed-deletion')
++    TestPersistence.reset([{ meta: removed, events: messageEvents('crashneedle') }])
++    const indexed = await liveContext({ path })
++    await indexed.plugin(TestPersistence)
++    await indexed.sessionQuery.searchSessions({ query: 'crashneedle' })
++    await indexed.fiber.dispose()
++    TestPersistence.entries.delete(removed.id)
++    TestPersistence.reads.clear()
++    class RecoveryPersistence extends TestPersistence {
++      override get deletionSupported(): boolean { return true }
++      override async deletedSessionIds(): Promise<readonly SessionIdType[]> { return [removed.id] }
++    }
++    const restarted = await liveContext({ path, openAt: 'never' })
++    try {
++      await restarted.plugin(RecoveryPersistence)
++      await vi.waitFor(() => {
++        const db = new DatabaseSync(path)
++        try { expect(db.prepare('SELECT id FROM persisted_sessions').all()).toEqual([]) }
++        finally { db.close() }
++      })
++      expect(TestPersistence.reads.size).toBe(0)
++    } finally { await restarted.fiber.dispose() }
++  })
++
+   it('defaults and validates opening policy and persisted inspection concurrency through its Cordis config', async () => {
+     const defaultCtx = await liveContext()
+     expect((defaultCtx.sessionQuery as SqliteSessionQueryEngine).config.openAt).toBe('startup')
+diff --git a/packages/workspace/workspace/src/index.ts b/packages/workspace/workspace/src/index.ts
+index 0f63050..1cd09c2 100644
+--- a/packages/workspace/workspace/src/index.ts
++++ b/packages/workspace/workspace/src/index.ts
+@@ -216,9 +216,38 @@ export class WorkspaceRegistry extends Service {
+     await this.indexLiveSessions()
+     this.validateStoredState(this.requireState())
+     this.rebuildEntities()
++    if (this.ctx.sessionPersistence.deletionSupported) {
++      await this.forgetSessions(await this.ctx.sessionPersistence.deletedSessionIds())
++    }
+     this.reportFilteredCandidates()
+   }
+ 
++  /**
++   * Remove permanently deleted identities from every durable workspace account.
++   * @param ids - identities already committed as deleted by persistence.
++   */
++  async forgetSessions(ids: readonly SessionId[]): Promise<void> {
++    if (ids.length === 0) return
++    await this.enqueueOperation(async () => {
++      const removed = new Set(ids)
++      for (const entity of this.entities.values()) {
++        for (const id of ids) await entity.detachSession(id)
++      }
++      const state = this.requireState()
++      await this.setState({
++        ...state,
++        pinnedSessionIds: state.pinnedSessionIds.filter(id => !removed.has(id)),
++        archivedSessionIds: state.archivedSessionIds.filter(id => !removed.has(id)),
++      })
++      for (const id of ids) {
++        this.headers.delete(id)
++        this.sessionPaths.delete(id)
++        this.missingSessionPaths.delete(id)
++        this.invalidSessionPaths.delete(id)
++      }
++    })
++  }
++
+   /**
+    * Create or reuse a workspace for an existing directory. The fully qualified
+    * path is canonicalized through `fs.realpath`; a relative, nonexistent, or
+diff --git a/packages/api/session-controller/src/index.ts b/packages/api/session-controller/src/index.ts
+index 2362bce..0ca4d9d 100644
+--- a/packages/api/session-controller/src/index.ts
++++ b/packages/api/session-controller/src/index.ts
+@@ -32,6 +32,8 @@ import { installModelSelectionProjection } from './model-selection-projection.ts
+ import { SessionSkillCatalog } from './skill-catalog.ts'
+ import { SessionMediaReferences } from './media-references.ts'
+ import { ArchivedSessionGate } from './archived-session-gate.ts'
++import { SessionDeletion } from './deletion.ts'
++import type { SessionDeletionPreview, SessionDeletionRequest } from './types.ts'
+ import type {
+   ModelCatalog,
+   SessionWorkspacePathApplication,
+@@ -92,6 +94,8 @@ function addressedSession(request: { readonly address: SessionAddress }): Sessio
+ 
+ /** Session Controller deployment policy. */
+ export interface Config {
++  /** Maximum wait for quiescence before refusing physical deletion. */
++  readonly deletionTimeoutMs?: number
+   /** Override platform desktop-opener detection. */
+   readonly nativeOpen?: boolean
+   /** Positive integral milliseconds of list work before yielding between complete rows. */
+@@ -133,6 +137,7 @@ export class SessionController extends TypertRemoteService {
+   ]
+ 
+   static Config: z<Config, ResolvedConfig> = z.object({
++    deletionTimeoutMs: z.natural().min(1).default(30_000),
+     nativeOpen: z.boolean(),
+     listWorkSliceMs: z.natural().min(1).default(16),
+   })
+@@ -148,6 +153,7 @@ export class SessionController extends TypertRemoteService {
+   private readonly revealPath: (path: string, signal: AbortSignal) => Promise<void>
+   private readonly canOpenPath: () => boolean
+   private readonly promotions = new Set<Promise<void>>()
++  private readonly deletion: SessionDeletion
+ 
+   /**
+    * @param ctx - Host context containing the Session capability assembly.
+@@ -158,6 +164,7 @@ export class SessionController extends TypertRemoteService {
+     super(ctx, 'sessionController', { namespace: 'session' })
+     ctx.typert.resources.register('session', { field: 'sessionId' })
+     const resolved = SessionController.Config(config)
++    this.deletion = new SessionDeletion(resolved.deletionTimeoutMs ?? 30_000)
+     installModelSelectionProjection(ctx)
+     this.agents = new ApiSessionAgentController(ctx)
+     this.commands = new SessionCommandController(ctx, this.agents, process.cwd())
+@@ -235,6 +242,26 @@ export class SessionController extends TypertRemoteService {
+     void task.finally(() => { this.promotions.delete(task) })
+   }
+ 
++  /**
++   * Preview permanent deletion of a conversation and its owned descendants.
++   * @param request - selected top-level Session identity.
++   * @returns the exact scope and running identities requiring confirmation.
++   */
++  @Remote('deletePreview')
++  deletePreview(request: { readonly sessionId: SessionId }): Promise<SessionDeletionPreview> {
++    return this.deletion.preview(this.ctx, request.sessionId)
++  }
++
++  /**
++   * Permanently delete the exact tree confirmed by the Host owner.
++   * @param request - confirmation fingerprint and identities from deletePreview.
++   * @returns every deleted Session identity after derived cleanup completes.
++   */
++  @Remote({ name: 'delete', resources: { session: (request: SessionDeletionRequest) => request.sessionIds } })
++  delete(request: SessionDeletionRequest): Promise<readonly SessionId[]> {
++    return this.deletion.execute(this.ctx, request)
++  }
++
+   /**
+    * Resolve or resume one ordinary Session for another Host API domain.
+    * @param sessionId - Session identity whose Agent owns the operation.
+diff --git a/packages/api/session-controller/src/types.ts b/packages/api/session-controller/src/types.ts
+index c0b2b9a..beb57bf 100644
+--- a/packages/api/session-controller/src/types.ts
++++ b/packages/api/session-controller/src/types.ts
+@@ -13,6 +13,27 @@ import type { Principal } from '@deepseek-ai/dsh-typert-protocol'
+ import type { JsonValue } from '@deepseek-ai/dsh-util-values'
+ import type { WorkspaceId } from '@deepseek-ai/dsh-workspace/types'
+ 
++/** Confirmation facts, containing no transcript content. */
++export interface SessionDeletionPreview {
++  readonly sessionId: SessionId
++  readonly sessionIds: readonly SessionId[]
++  readonly fingerprint: string
++  readonly runningSessionIds: readonly SessionId[]
++}
++
++/** The exact preview the user confirmed; the Host revalidates every identity. */
++export interface SessionDeletionRequest extends SessionDeletionPreview {
++  readonly stopRunning: true
++}
++
++declare module '@deepseek-ai/dsh-typert-protocol' {
++  interface RemoteErrorDetailsMap {
++    'session/delete-rejected': { readonly reason: string }
++    'session/delete-unsupported': { readonly reason: string }
++    'session/delete-scope-changed': { readonly reason: string }
++  }
++}
++
+ declare module '@deepseek-ai/dsh-session-projection/types' {
+   interface SessionProjectionStateMap {
+     /** Host state persisted for cold Session list summaries. */
+diff --git a/packages/api/session-controller/tsconfig.host.json b/packages/api/session-controller/tsconfig.host.json
+index 8f90ca7..248521b 100644
+--- a/packages/api/session-controller/tsconfig.host.json
++++ b/packages/api/session-controller/tsconfig.host.json
+@@ -13,6 +13,7 @@
+     "src/assistant-stream.ts",
+     "src/catalog.ts",
+     "src/commands.ts",
++    "src/deletion.ts",
+     "src/control.ts",
+     "src/file-references.ts",
+     "src/history.ts",
+diff --git a/packages/client/ui-workspace/src/client/rows/Rows.tsx b/packages/client/ui-workspace/src/client/rows/Rows.tsx
+index 216a6fc..a73afa5 100644
+--- a/packages/client/ui-workspace/src/client/rows/Rows.tsx
++++ b/packages/client/ui-workspace/src/client/rows/Rows.tsx
+@@ -588,6 +588,12 @@ export function SessionNodeItem({
+     <div
+       ref={rowRef}
+       data-row-key={`session:${node.id}`}
++      onContextMenu={(event) => {
++        if (row.blank) return
++        event.preventDefault()
++        event.stopPropagation()
++        setMenuOpen(true)
++      }}
+       className={clsx(
+         css.sessionRow, selected && css.selected, menuOpen && css.menuOpen,
+         row.archived && css.archived,
+diff --git a/packages/client/ui-workspace/src/client/navigation.ts b/packages/client/ui-workspace/src/client/navigation.ts
+index 55e0305..8551477 100644
+--- a/packages/client/ui-workspace/src/client/navigation.ts
++++ b/packages/client/ui-workspace/src/client/navigation.ts
+@@ -408,8 +408,15 @@ class UiWorkspaceService extends Service implements UiWorkspace {
+ 
+   private watchNavigation(): () => void {
+     let initial: 'waiting' | 'connecting' | 'done' = 'waiting'
++    let previous = this.sessions.list.getSnapshot()
+     const reconcile = (): void => {
+       if (this.lifetime.signal.aborted) return
++      const listed = this.sessions.list.getSnapshot()
++      const current = this.mainReference?.sessionId
++      const removed = listed.phase === 'ready' && previous.phase === 'ready'
++        && current !== undefined && previous.byId[current] !== undefined && listed.byId[current] === undefined
++      previous = listed
++      if (removed) this.clearMain()
+       if (this.clearArchivedCurrent()) return
+       if (initial !== 'waiting') return
+       const workspace = this.workspaces.list.getSnapshot()
+diff --git a/packages/client/ui-workspace/tests/workspaces-service.client.spec.ts b/packages/client/ui-workspace/tests/workspaces-service.client.spec.ts
+index 90d3e8e..3f9fe3e 100644
+--- a/packages/client/ui-workspace/tests/workspaces-service.client.spec.ts
++++ b/packages/client/ui-workspace/tests/workspaces-service.client.spec.ts
+@@ -1467,6 +1467,23 @@ describe('UiWorkspaceService', () => {
+     expect(b.selectPanel).toHaveBeenCalledTimes(2)
+   })
+ 
++  it('closes a selected conversation removed from the authoritative catalog', () => {
++    const b = bench({ sessions: sessionState([summary('deleted'), summary('retained')]) })
++    b.uiWorkspace.openSession(sid('deleted'))
++    b.sessions.list.set(sessionState([summary('retained')]))
++    expect(b.sessions.retained[0]!.release).toHaveBeenCalledOnce()
++    expect(b.selectPanel).toHaveBeenLastCalledWith(null)
++  })
++
++  it('keeps a newly selected conversation that has not entered the catalog yet', () => {
++    const b = bench({ sessions: sessionState() })
++    b.uiWorkspace.openSession(sid('newly-created'))
++    b.workspaces.list.set(workspaceState())
++    expect(b.sessions.retained[0]!.release).not.toHaveBeenCalled()
++    b.sessions.list.set(sessionState([summary('newly-created')]))
++    expect(b.sessions.retained[0]!.release).not.toHaveBeenCalled()
++  })
++
+   it('clears a selected Session after archiving it without an intervening snapshot', async () => {
+     const b = bench()
+     b.workspaces.onArchive = async () => {}
+diff --git a/packages/api/session-controller/src/deletion.ts b/packages/api/session-controller/src/deletion.ts
+new file mode 100644
+index 0000000..aa3d958
+--- /dev/null
++++ b/packages/api/session-controller/src/deletion.ts
+@@ -0,0 +1,132 @@
++/** Owner-only deletion of an exact, quiescent Session tree. */
++import { createHash } from 'node:crypto'
++import type { Context } from '@deepseek-ai/cordis'
++import type { SessionHeader, SessionId } from '@deepseek-ai/dsh-session'
++import type {} from '@deepseek-ai/dsh-session-projection-cache'
++import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
++import type {} from '@deepseek-ai/dsh-api-remote-access'
++import type {} from '@deepseek-ai/dsh-workspace'
++import type { SessionDeletionPreview, SessionDeletionRequest } from './types.ts'
++
++function reject(reason: string, code: 'session/delete-rejected' | 'session/delete-unsupported' | 'session/delete-scope-changed' = 'session/delete-rejected'): never {
++  throw new RemoteError(code, reason, { reason })
++}
++
++/** One Host-owned coordinator; the transport supplies its invocation Context. */
++export class SessionDeletion {
++  private readonly previews = new Map<SessionId, { preview: SessionDeletionPreview; headers: readonly SessionHeader[] }>()
++  private readonly executing = new Set<SessionId>()
++
++  constructor(private readonly timeoutMs: number) {}
++
++  private authorize(ctx: Context, ids: readonly SessionId[]): void {
++    if (ctx.invocation?.peer.principal.kind !== 'owner') reject('Only the Host owner can permanently delete conversations')
++    for (const id of ids) {
++      if (!ctx.remoteAccess.allows({ kind: 'session', id })) reject('Conversation access denied')
++    }
++  }
++
++  private async collect(ctx: Context, sessionId: SessionId): Promise<SessionHeader[]> {
++    const persistence = ctx.get('sessionPersistence')
++    if (persistence?.deletionSupported !== true) reject('This Host does not support permanent conversation deletion', 'session/delete-unsupported')
++    const headers = new Map((await persistence.list()).map(row => [row.header.id, row.header]))
++    for (const session of ctx.sessions.list()) headers.set(session.id, session.header)
++    const root = headers.get(sessionId)
++    if (root === undefined) reject('Conversation no longer exists')
++    if (root.origin === 'subagent') reject('Delete a teammate through its owning conversation')
++    const selected = new Set<SessionId>([sessionId])
++    let previous: number
++    do {
++      previous = selected.size
++      for (const header of headers.values()) {
++        if (header.origin === 'subagent' && header.parentSession !== undefined && selected.has(header.parentSession)) {
++          selected.add(header.id)
++        }
++      }
++    } while (selected.size !== previous)
++    return [...selected].sort().map(id => headers.get(id)!)
++  }
++
++  private fingerprint(headers: readonly SessionHeader[]): string {
++    return createHash('sha256').update(JSON.stringify(headers.map(header => [
++      header.id, header.createdAt, header.cwd, header.parentSession, header.origin,
++    ]))).digest('hex')
++  }
++
++  /** Inspect the selected tree without starting or stopping an Agent. */
++  async preview(ctx: Context, sessionId: SessionId): Promise<SessionDeletionPreview> {
++    this.authorize(ctx, [sessionId])
++    const headers = await this.collect(ctx, sessionId)
++    const sessionIds = headers.map(header => header.id)
++    this.authorize(ctx, sessionIds)
++    const preview: SessionDeletionPreview = {
++      sessionId, sessionIds, fingerprint: this.fingerprint(headers),
++      runningSessionIds: sessionIds.filter(id => ctx.agents.get(id)?.status === 'running'),
++    }
++    this.previews.set(sessionId, { preview, headers })
++    return preview
++  }
++
++  /** Stop, revalidate, commit deletion, and remove derived records before reporting success. */
++  async execute(ctx: Context, request: SessionDeletionRequest): Promise<readonly SessionId[]> {
++    this.authorize(ctx, request.sessionIds)
++    const persistence = ctx.get('sessionPersistence')
++    if (persistence?.deletionSupported !== true) reject('This Host does not support permanent conversation deletion', 'session/delete-unsupported')
++    if (request.stopRunning !== true) reject('Explicit stop-and-delete confirmation is required')
++    const saved = this.previews.get(request.sessionId)
++    if (saved === undefined || saved.preview.fingerprint !== request.fingerprint
++      || JSON.stringify(saved.preview.sessionIds) !== JSON.stringify(request.sessionIds)) {
++      reject('Conversation scope changed; preview and confirm deletion again', 'session/delete-scope-changed')
++    }
++    if (this.executing.has(request.sessionId)) reject('Conversation deletion is already in progress')
++    this.executing.add(request.sessionId)
++    let release: (() => void) | undefined
++    let stopping: Promise<void> | undefined
++    try {
++      const deleted = new Set(await persistence.deletedSessionIds())
++      const committed = request.sessionIds.every(id => deleted.has(id))
++      if (!committed) {
++        const headers = await this.collect(ctx, request.sessionId)
++        if (this.fingerprint(headers) !== request.fingerprint) reject('Conversation scope changed; preview and confirm deletion again', 'session/delete-scope-changed')
++      }
++      release = ctx.sessions.reserveDeletion(request.sessionIds)
++      if (!committed && this.fingerprint(await this.collect(ctx, request.sessionId)) !== request.fingerprint) {
++        reject('Conversation scope changed; preview and confirm deletion again', 'session/delete-scope-changed')
++      }
++      stopping = (async () => {
++        for (const id of request.sessionIds) ctx.agents.get(id)?.cancel({ kind: 'user' }, { keepInbox: false })
++        for (const id of request.sessionIds) await ctx.parallel('workspace/session-stop', { sessionId: id })
++        const disposed = await Promise.allSettled(request.sessionIds.map(id => ctx.agents.disposeForDeletion(id)))
++        const failed = disposed.find(result => result.status === 'rejected')
++        if (failed?.status === 'rejected') throw failed.reason
++        for (const id of request.sessionIds) {
++          const activity = await ctx.waterfall('workspace/session-activity', { sessionId: id }, () => Promise.resolve([]))
++          if (activity.length || ctx.sessions.get(id) !== undefined) reject('Conversation activity has not stopped')
++        }
++      })()
++      let timer: ReturnType<typeof setTimeout> | undefined
++      try {
++        await Promise.race([stopping, new Promise<never>((_resolve, fail) => {
++          timer = setTimeout(() => fail(new Error('Stopping conversation activity timed out')), this.timeoutMs)
++        })])
++      } finally {
++        if (timer !== undefined) clearTimeout(timer)
++      }
++      await persistence.deleteSessions(saved.headers)
++      await ctx.get('sessionProjectionCache')?.forgetSessions(request.sessionIds)
++      await ctx.workspaceRegistry.forgetSessions(request.sessionIds)
++      await ctx.sessionQuery.reconcileDeletedSessions(request.sessionIds)
++      for (const id of request.sessionIds) ctx.emit('api-session/removed', id)
++      return request.sessionIds
++    } finally {
++      const finish = (): void => {
++        release?.()
++        this.executing.delete(request.sessionId)
++      }
++      // A timeout returns to the caller but does not grant another lifecycle
++      // permission to reuse these identities while teardown is still running.
++      if (stopping) void stopping.then(finish, finish)
++      else finish()
++    }
++  }
++}
+diff --git a/packages/api/session-controller/tests/deletion.spec.ts b/packages/api/session-controller/tests/deletion.spec.ts
+new file mode 100644
+index 0000000..a001e96
+--- /dev/null
++++ b/packages/api/session-controller/tests/deletion.spec.ts
+@@ -0,0 +1,162 @@
++import { afterEach, describe, expect, it, vi } from 'vitest'
++import { Context } from '@deepseek-ai/cordis'
++import { SessionId, SESSION_FORMAT_VERSION, type SessionHeader } from '@deepseek-ai/dsh-session'
++import { SessionDeletion } from '../src/deletion.ts'
++
++const contexts: Context[] = []
++afterEach(async () => {
++  for (const ctx of contexts.splice(0)) await ctx.fiber.dispose()
++})
++function header(id: string, parent?: string, owned = false): SessionHeader {
++  return {
++    id: SessionId(id), createdAt: 1, version: SESSION_FORMAT_VERSION, isSeeded: false,
++    ...(parent ? { parentSession: SessionId(parent) } : {}),
++    ...(owned ? { origin: 'subagent' as const } : {}),
++  }
++}
++function setup(options: { owner?: boolean; denied?: string; supported?: boolean } = {}) {
++  const ctx = new Context()
++  contexts.push(ctx)
++  const headers = [header('root'), header('child', 'root', true), header('fork', 'root')]
++  const deleted = new Set<SessionId>()
++  const busy = new Set<SessionId>()
++  const reserved = new Set<SessionId>()
++  // These are unit-test ports. Real storage and Loader/browser composition
++  // are exercised separately; none of these stubs establish integration.
++  const remove = vi.fn(async (targets: readonly SessionHeader[]) => {
++    for (const target of targets) deleted.add(target.id)
++  })
++  const dispose = vi.fn(async (id: SessionId) => { busy.delete(id) })
++  const forget = vi.fn(async () => {})
++  if (options.owner !== false) ctx.provide('invocation', { peer: { principal: { kind: 'owner' } } } as never)
++  ctx.provide('remoteAccess', { allows: ({ id }: { id: string }) => id !== options.denied } as never)
++  ctx.provide('sessionPersistence', {
++    deletionSupported: options.supported ?? true,
++    list: async () => headers.filter(item => !deleted.has(item.id)).map(item => ({ header: item })),
++    deletedSessionIds: async () => [...deleted], deleteSessions: remove,
++  } as never)
++  ctx.provide('sessions', {
++    list: () => [],
++    get: () => undefined,
++    reserveDeletion: (ids: readonly SessionId[]) => {
++      for (const id of ids) reserved.add(id)
++      return () => reserved.clear()
++    },
++  } as never)
++  ctx.provide('agents', {
++    get: (id: SessionId) => busy.has(id) ? { status: 'running', cancel: vi.fn() } : undefined,
++    disposeForDeletion: dispose,
++  } as never)
++  ctx.provide('workspaceRegistry', { forgetSessions: forget } as never)
++  ctx.provide('sessionQuery', { reconcileDeletedSessions: vi.fn(async () => {}) } as never)
++  return { ctx, headers, deleted, busy, reserved, remove, dispose, forget, deletion: new SessionDeletion(1000) }
++}
++describe('owner conversation deletion', () => {
++  it('previews owned descendants and excludes independent forks without mutating data', async () => {
++    const fixture = setup()
++    fixture.busy.add(SessionId('child'))
++    const preview = await fixture.deletion.preview(fixture.ctx, SessionId('root'))
++    expect(preview.sessionIds).toEqual(['child', 'root'])
++    expect(preview.runningSessionIds).toEqual(['child'])
++    expect(fixture.remove).not.toHaveBeenCalled()
++    expect(fixture.dispose).not.toHaveBeenCalled()
++  })
++
++  it('refuses a forged scope and changed family before stopping or deleting', async () => {
++    const fixture = setup()
++    const preview = await fixture.deletion.preview(fixture.ctx, SessionId('root'))
++    await expect(fixture.deletion.execute(fixture.ctx, {
++      ...preview, sessionIds: [SessionId('root')], stopRunning: true,
++    })).rejects.toThrow('scope changed')
++    fixture.headers.push(header('late-child', 'root', true))
++    await expect(fixture.deletion.execute(fixture.ctx, { ...preview, stopRunning: true })).rejects.toThrow('scope changed')
++    expect(fixture.remove).not.toHaveBeenCalled()
++    expect(fixture.dispose).not.toHaveBeenCalled()
++  })
++
++  it('reports an unsupported persistence provider explicitly', async () => {
++    const fixture = setup({ supported: false })
++    await expect(fixture.deletion.preview(fixture.ctx, SessionId('root')))
++      .rejects.toMatchObject({ code: 'session/delete-unsupported' })
++    expect(fixture.dispose).not.toHaveBeenCalled()
++  })
++
++  it('stops the selected family and clears references before returning, including duplicate retries', async () => {
++    const fixture = setup()
++    fixture.busy.add(SessionId('root'))
++    const preview = await fixture.deletion.preview(fixture.ctx, SessionId('root'))
++    const request = { ...preview, stopRunning: true as const }
++    expect(await fixture.deletion.execute(fixture.ctx, request)).toEqual(preview.sessionIds)
++    expect(fixture.busy.size).toBe(0)
++    expect(fixture.reserved.size).toBe(0)
++    expect(fixture.forget).toHaveBeenCalledWith(preview.sessionIds)
++    expect(fixture.deleted.has(SessionId('fork'))).toBe(false)
++    expect(await fixture.deletion.execute(fixture.ctx, request)).toEqual(preview.sessionIds)
++  })
++
++  it('does not remove files when Agent teardown fails', async () => {
++    const fixture = setup()
++    const preview = await fixture.deletion.preview(fixture.ctx, SessionId('root'))
++    fixture.dispose.mockRejectedValueOnce(new Error('stop failed'))
++    await expect(fixture.deletion.execute(fixture.ctx, { ...preview, stopRunning: true })).rejects.toThrow('stop failed')
++    expect(fixture.remove).not.toHaveBeenCalled()
++    expect(fixture.reserved.size).toBe(0)
++  })
++
++  it('keeps timed-out identities reserved until the exact teardown settles and rejects duplicate submissions', async () => {
++    const fixture = setup()
++    const deletion = new SessionDeletion(10)
++    const stopped = Promise.withResolvers<void>()
++    fixture.dispose.mockImplementation(() => stopped.promise)
++    const preview = await deletion.preview(fixture.ctx, SessionId('root'))
++    const request = { ...preview, stopRunning: true as const }
++    const execution = deletion.execute(fixture.ctx, request)
++    await expect(execution).rejects.toThrow('timed out')
++    expect(fixture.reserved.size).toBe(2)
++    expect(fixture.remove).not.toHaveBeenCalled()
++    await expect(deletion.execute(fixture.ctx, request)).rejects.toThrow('already in progress')
++    stopped.resolve()
++    await vi.waitFor(() => { expect(fixture.reserved.size).toBe(0) })
++    fixture.dispose.mockImplementation(async () => {})
++    expect(await deletion.execute(fixture.ctx, request)).toEqual(preview.sessionIds)
++  })
++
++  it('holds admission until all teardown promises settle after one member fails', async () => {
++    const fixture = setup()
++    const pending = Promise.withResolvers<void>()
++    fixture.dispose.mockImplementation(id => id === 'child' ? Promise.reject(new Error('stop failed')) : pending.promise)
++    const preview = await fixture.deletion.preview(fixture.ctx, SessionId('root'))
++    const execution = fixture.deletion.execute(fixture.ctx, { ...preview, stopRunning: true })
++    const rejected = expect(execution).rejects.toThrow('stop failed')
++    await vi.waitFor(() => { expect(fixture.dispose).toHaveBeenCalledTimes(2) })
++    expect(fixture.reserved.size).toBe(2)
++    expect(fixture.remove).not.toHaveBeenCalled()
++    pending.resolve()
++    await rejected
++    expect(fixture.reserved.size).toBe(0)
++  })
++
++  it('retries partially committed cleanup with the same confirmed scope', async () => {
++    const fixture = setup()
++    const preview = await fixture.deletion.preview(fixture.ctx, SessionId('root'))
++    fixture.remove.mockImplementationOnce(async (targets) => {
++      for (const target of targets) fixture.deleted.add(target.id)
++      throw new Error('cleanup pending')
++    })
++    const request = { ...preview, stopRunning: true as const }
++    await expect(fixture.deletion.execute(fixture.ctx, request)).rejects.toThrow('cleanup pending')
++    expect(await fixture.deletion.execute(fixture.ctx, request)).toEqual(preview.sessionIds)
++  })
++
++  it('rejects a direct invocation without an owner principal', async () => {
++    const fixture = setup({ owner: false })
++    await expect(fixture.deletion.preview(fixture.ctx, SessionId('root'))).rejects.toThrow('Only the Host owner')
++    expect(fixture.remove).not.toHaveBeenCalled()
++  })
++
++  it('rejects denied descendant access without returning the tree', async () => {
++    const fixture = setup({ denied: 'child' })
++    await expect(fixture.deletion.preview(fixture.ctx, SessionId('root'))).rejects.toThrow('access denied')
++    expect(fixture.remove).not.toHaveBeenCalled()
++  })
++})
+diff --git a/packages/session/session-persistence-jsonl/src/deletion.ts b/packages/session/session-persistence-jsonl/src/deletion.ts
+new file mode 100644
+index 0000000..2241708
+--- /dev/null
++++ b/packages/session/session-persistence-jsonl/src/deletion.ts
+@@ -0,0 +1,135 @@
++/** Writer-exclusive transcript removal with durable, content-free retry records. */
++import { mkdir, open, readFile, readdir, realpath, rename, unlink } from 'node:fs/promises'
++import { isAbsolute, join, relative, resolve, sep } from 'node:path'
++import { randomUUID } from 'node:crypto'
++import type { SessionHeader, SessionId } from '@deepseek-ai/dsh-session'
++import { SessionPersistenceNotFoundError } from '@deepseek-ai/dsh-session-persistence'
++import { SessionWriteLease, LEASE_FILENAME } from './lease.ts'
++import { sessionDir } from './format.ts'
++
++export const DELETION_LOCK_DIRECTORY = '.session-deletion-lock'
++const JOURNAL = '.session-deletions.json'
++
++interface DeletionRecord {
++  readonly id: SessionId
++  readonly directory: string
++}
++
++/** This journal retains identities and locations, never transcript text or titles. */
++export class JsonlDeletionJournal {
++  constructor(private readonly root: string) {}
++
++  async records(): Promise<readonly DeletionRecord[]> {
++    let text: string
++    try {
++      text = await readFile(join(this.root, JOURNAL), 'utf8')
++    } catch (error: unknown) {
++      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return []
++      throw error
++    }
++    const value: unknown = JSON.parse(text)
++    if (!Array.isArray(value)) throw new Error('Invalid Session deletion journal')
++    return value.map((entry: unknown) => {
++      if (entry === null || typeof entry !== 'object'
++        || !('id' in entry) || typeof entry.id !== 'string' || entry.id.length === 0
++        || !('directory' in entry) || typeof entry.directory !== 'string') {
++        throw new Error('Invalid Session deletion record')
++      }
++      const directory = this.checkedPath(entry.directory)
++      return { id: entry.id as SessionId, directory: relative(this.root, directory) }
++    })
++  }
++
++  async assertReadable(id: SessionId): Promise<void> {
++    if ((await this.records()).some(record => record.id === id)) throw new SessionPersistenceNotFoundError(id)
++  }
++
++  private checkedPath(directory: string): string {
++    const target = resolve(this.root, directory)
++    if (isAbsolute(directory) || !target.startsWith(`${this.root}${sep}`)) {
++      throw new Error('Session deletion path escapes persistence root')
++    }
++    // A transcript directory has exactly project/session depth.
++    if (relative(this.root, target).split(sep).length !== 2) throw new Error('Invalid Session deletion directory')
++    return target
++  }
++
++  private async assertPhysicalDirectory(directory: string): Promise<void> {
++    const actualRoot = await realpath(this.root)
++    const actual = await realpath(directory)
++    if (!actual.startsWith(`${actualRoot}${sep}`) || actual !== directory) {
++      throw new Error('Session deletion refuses linked directories')
++    }
++  }
++
++  /** Acquire every transcript lock before committing any deletion identity. */
++  async remove(headers: readonly SessionHeader[]): Promise<void> {
++    await mkdir(this.root, { recursive: true, mode: 0o700 })
++    const journalLease = await SessionWriteLease.acquire(join(this.root, DELETION_LOCK_DIRECTORY), 'session-deletion-journal' as SessionId)
++    const leases: SessionWriteLease[] = []
++    try {
++      const records = new Map((await this.records()).map(record => [record.id, record]))
++      const targets = headers.map(header => records.get(header.id) ?? {
++        id: header.id, directory: relative(this.root, sessionDir(this.root, header.cwd, header.id)),
++      })
++      targets.sort((a, b) => a.id.localeCompare(b.id))
++      for (const record of targets) {
++        const directory = this.checkedPath(record.directory)
++        await this.assertPhysicalDirectory(directory)
++        leases.push(await SessionWriteLease.acquire(directory, record.id))
++        // Never follow a foreign directory added while lock acquisition awaited.
++        await this.assertPhysicalDirectory(directory)
++        for (const entry of await readdir(directory, { withFileTypes: true })) {
++          if (!entry.isFile()) throw new Error('Session deletion refuses unexpected directory entries')
++        }
++      }
++      for (const record of targets) records.set(record.id, record)
++      const temporary = join(this.root, `${JOURNAL}.${randomUUID()}.tmp`)
++      const file = await open(temporary, 'wx', 0o600)
++      try {
++        await file.writeFile(JSON.stringify([...records.values()]))
++        await file.sync()
++      } finally {
++        await file.close()
++      }
++      await rename(temporary, join(this.root, JOURNAL))
++      await this.syncRoot()
++      for (const record of targets) await this.clean(record)
++    } finally {
++      const failures: unknown[] = []
++      for (const lease of leases.reverse()) {
++        try { await lease.release() } catch (error: unknown) { failures.push(error) }
++      }
++      try { await journalLease.release() } catch (error: unknown) { failures.push(error) }
++      if (failures.length) throw new AggregateError(failures, 'Session deletion lock release failed')
++    }
++  }
++
++  /** Resume a committed operation after process death before serving storage. */
++  async recover(): Promise<void> {
++    for (const record of await this.records()) {
++      const directory = this.checkedPath(record.directory)
++      await this.assertPhysicalDirectory(directory)
++      const lease = await SessionWriteLease.acquire(directory, record.id)
++      try { await this.clean(record) } finally { await lease.release() }
++    }
++  }
++
++  private async clean(record: DeletionRecord): Promise<void> {
++    const directory = this.checkedPath(record.directory)
++    await this.assertPhysicalDirectory(directory)
++    for (const entry of await readdir(directory, { withFileTypes: true })) {
++      if (entry.name === LEASE_FILENAME) continue
++      if (!entry.isFile()) throw new Error('Session deletion refuses unexpected directory entries')
++      await unlink(join(directory, entry.name))
++    }
++    // Keep the stable lock inode and directory so another writer cannot lock
++    // a replacement inode while an existing descriptor is still held.
++  }
++
++  private async syncRoot(): Promise<void> {
++    if (process.platform === 'win32') return
++    const directory = await open(this.root, 'r')
++    try { await directory.sync() } finally { await directory.close() }
++  }
++}
+diff --git a/packages/session/session-persistence-jsonl/tests/deletion.spec.ts b/packages/session/session-persistence-jsonl/tests/deletion.spec.ts
+new file mode 100644
+index 0000000..32c107a
+--- /dev/null
++++ b/packages/session/session-persistence-jsonl/tests/deletion.spec.ts
+@@ -0,0 +1,120 @@
++import { afterEach, describe, expect, it, vi } from 'vitest'
++import { Context } from '@deepseek-ai/cordis'
++import { mkdir, mkdtemp, readFile, readdir, rm } from 'node:fs/promises'
++import { resolve, join } from 'node:path'
++import { SessionId, SESSION_FORMAT_VERSION, type SessionHeader } from '@deepseek-ai/dsh-session'
++import * as backend from '../src/index.ts'
++import { sessionDir } from '../src/format.ts'
++
++const fault = vi.hoisted(() => ({ unlink: false }))
++vi.mock('node:fs/promises', async (original) => {
++  const actual = await original<typeof import('node:fs/promises')>()
++  return {
++    ...actual,
++    unlink: async (path: Parameters<typeof actual.unlink>[0]) => {
++      if (fault.unlink) {
++        fault.unlink = false
++        throw new Error('injected transcript cleanup failure')
++      }
++      return actual.unlink(path)
++    },
++  }
++})
++
++const contexts: Context[] = []
++const roots: string[] = []
++async function openBackend(root?: string): Promise<Context> {
++  await mkdir(resolve('.artifacts'), { recursive: true })
++  const directory = root ?? await mkdtemp(resolve('.artifacts/ae-delete-'))
++  if (root === undefined) roots.push(directory)
++  const ctx = new Context()
++  contexts.push(ctx)
++  await ctx.plugin(backend, { root: directory, compression: 'none' })
++  return ctx
++}
++function header(id: string, parentSession?: string, child = false): SessionHeader {
++  return {
++    id: SessionId(id), version: SESSION_FORMAT_VERSION, createdAt: 1, isSeeded: false,
++    cwd: resolve('.'),
++    ...(parentSession ? { parentSession: SessionId(parentSession) } : {}),
++    ...(child ? { origin: 'subagent' as const } : {}),
++  }
++}
++async function persist(ctx: Context, meta: SessionHeader) {
++  const handle = await ctx.sessionPersistence.create(meta)
++  await handle.flush()
++  await handle.close()
++}
++afterEach(async () => {
++  fault.unlink = false
++  for (const ctx of contexts.splice(0)) await ctx.fiber.dispose()
++  for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true })
++})
++
++describe('permanent Session deletion', () => {
++  it('removes only the selected transcripts, rejects resurrection, and survives restart', async () => {
++    const ctx = await openBackend()
++    const root = roots[0]!
++    const parent = header('parent')
++    const child = header('child', 'parent', true)
++    const independent = header('fork', 'parent')
++    for (const item of [parent, child, independent]) await persist(ctx, item)
++    const oldReader = await ctx.sessionPersistence.open(parent.id, 'read')
++    await ctx.sessionPersistence.deleteSessions([parent, child])
++    expect(await ctx.sessionPersistence.stat(parent.id)).toBeUndefined()
++    expect((await ctx.sessionPersistence.list()).map(row => row.header.id)).toEqual([independent.id])
++    await expect(ctx.sessionPersistence.open(parent.id, 'read')).rejects.toThrow()
++    await expect(ctx.sessionPersistence.create(parent)).rejects.toThrow()
++    await expect(oldReader.read()).rejects.toThrow()
++    await oldReader.close()
++    const entries = await readdir(sessionDir(root, parent.cwd, parent.id))
++    expect(entries.every(name => name === 'session.lock')).toBe(true)
++    await ctx.fiber.dispose()
++    const reopened = await openBackend(root)
++    expect((await reopened.sessionPersistence.list()).map(row => row.header.id)).toEqual([independent.id])
++    expect(await reopened.sessionPersistence.deletedSessionIds()).toContain(parent.id)
++  })
++
++  it('does not commit any deletion while a target writer is held', async () => {
++    const ctx = await openBackend()
++    const one = header('one')
++    const two = header('two')
++    await persist(ctx, one)
++    await persist(ctx, two)
++    const competing = await openBackend(roots[0])
++    const writer = await competing.sessionPersistence.open(two.id, 'write')
++    await expect(ctx.sessionPersistence.deleteSessions([one, two])).rejects.toThrow()
++    expect(await ctx.sessionPersistence.deletedSessionIds()).toEqual([])
++    expect(await ctx.sessionPersistence.stat(one.id)).toBeDefined()
++    expect(await ctx.sessionPersistence.stat(two.id)).toBeDefined()
++    await writer.close()
++    await ctx.sessionPersistence.deleteSessions([one, two])
++    expect(await ctx.sessionPersistence.list()).toEqual([])
++  })
++
++  it('recovers committed cleanup after a partial failure without exposing the transcript', async () => {
++    const ctx = await openBackend()
++    const meta = header('retry')
++    await persist(ctx, meta)
++    fault.unlink = true
++    await expect(ctx.sessionPersistence.deleteSessions([meta])).rejects.toThrow('injected')
++    expect(await ctx.sessionPersistence.stat(meta.id)).toBeUndefined()
++    expect(await ctx.sessionPersistence.list()).toEqual([])
++    await ctx.fiber.dispose()
++    const resumed = await openBackend(roots[0])
++    expect(await resumed.sessionPersistence.list()).toEqual([])
++    await expect(resumed.sessionPersistence.create(meta)).rejects.toThrow()
++    const bytes = await readFile(join(roots[0]!, '.session-deletions.json'), 'utf8')
++    expect(bytes).not.toContain('"title"')
++    expect(bytes).not.toContain('"content"')
++  })
++
++  it('allows repeated physical cleanup with the original confirmed identities', async () => {
++    const ctx = await openBackend()
++    const meta = header('idempotent')
++    await persist(ctx, meta)
++    await ctx.sessionPersistence.deleteSessions([meta])
++    await ctx.sessionPersistence.deleteSessions([meta])
++    expect(await ctx.sessionPersistence.deletedSessionIds()).toEqual([meta.id])
++  })
++})

@@ -1,0 +1,32 @@
+{
+  "tag": "dsh-v0.2.1-rc.3",
+  "commit": "1f81c047fc48fa190a683e469daa699857e9afe8",
+  "patchSha256": "38bc9d88a5459f139866bb6a410d3dcb529b90af32d689f9ee35f3d317061e8d",
+  "files": {
+    "docs/architecture.md": "95a7722c7096d665d8adedeb733b8f5ad7740e67cb5c6e9dc91ec05f430cb760",
+    "packages/core/agent-loop/src/agent.ts": "4add12f5c22bb1b8cf1dbc239c9b09fa3351feff2c936cb2b8900036468bd01b",
+    "packages/core/agent-loop/src/inbox.ts": "70c07ea75ebcf18df353bbccf7c2aa3ecf6cb0d687b96e3520b675680c29f662",
+    "packages/core/agent-loop/tests/inbox.spec.ts": "f14a53f564af1e2131e2cef22e092ef6a48d26204ebbf55d77064a6c8eab5d7d",
+    "packages/core/agent/src/index.ts": "218b30227cdc55d4c193112495a852507d12070028572ac95e6f9d1f954d1077",
+    "packages/core/session/src/index.ts": "c1f08f7dcf4075eeebb13e6ea06b3f348bfeb85b8a5d4e4bfd1c3b93c1959332",
+    "packages/session/session-persistence/src/index.ts": "d3da1fc3977e23eb5c2f73d6245a0d9c5967f9a0d755065e74ccd26e76794f14",
+    "packages/session/session-persistence-jsonl/src/index.ts": "52cad4e39f5ba4d173ec322c647f16bac12385b4819aa07684f12a123f94f72f",
+    "packages/session/session-persistence-jsonl/src/storage.ts": "57d5fa1d7efd17789d6a223f6aa5e06b79092665bea13f8a23d3bab644d066c3",
+    "packages/session/session-persistence-jsonl/tests/jsonl.spec.ts": "87973b1634f9110d4236d24fc49e7f251a0a0167860faafb4f8df57208a8f424",
+    "packages/session/session-projection-cache/src/index.ts": "1cfb6536124a3fd4f2a8d878f57c2c860178920a54b8c5832bd662db75f030e7",
+    "packages/session-query/session-query/src/index.ts": "549f7f90c90efec63a5c7d69dbc65938c0f9578f85dcfc8ee25a49a43a8e83e3",
+    "packages/session-query/session-query-sqlite/src/index.ts": "72868e4ae967fee94967df5939ee092a582249ff7b37afc4fe0cf7660d48b8d3",
+    "packages/session-query/session-query-sqlite/tests/sqlite.spec.ts": "112fe7bf3e2b405c87b6caca0c9a40174402025caf0bd36ad2117238459f6295",
+    "packages/workspace/workspace/src/index.ts": "9985d242e1151672e2fb374e469a6eda97fe9eabd9118d258cdf9a93dd70c20d",
+    "packages/api/session-controller/src/index.ts": "a85ee64c5e5cb20bfa40d3a7f07cdd2f490c82268f08cfc53df6fd72458574c4",
+    "packages/api/session-controller/src/types.ts": "72a35c7df913a2a2d0548b40aa8a7abbbbc7807e55f4f9f5fb236a9a2550a042",
+    "packages/api/session-controller/tsconfig.host.json": "da33ce732691e7024298a02841d4178467eb0fca7a4e2ad606a55c663f3995f5",
+    "packages/client/ui-workspace/src/client/rows/Rows.tsx": "b8a7da793a526a1b4e04f321be547dfb2983b73b6604c474ed1fcb41e8493408",
+    "packages/client/ui-workspace/src/client/navigation.ts": "e85db0304cc7f9fa61dc0e2b34e420dbcaea62478eefcb223af3da4af0a26076",
+    "packages/client/ui-workspace/tests/workspaces-service.client.spec.ts": "adfdd846ff3c38c8b51797a3640893f2f5fef8d8e7d7c953e36f5d94a40ca3d5",
+    "packages/api/session-controller/src/deletion.ts": null,
+    "packages/api/session-controller/tests/deletion.spec.ts": null,
+    "packages/session/session-persistence-jsonl/src/deletion.ts": null,
+    "packages/session/session-persistence-jsonl/tests/deletion.spec.ts": null
+  }
+}
