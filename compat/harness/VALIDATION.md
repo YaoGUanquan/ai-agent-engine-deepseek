@@ -16,6 +16,33 @@
 | 原版宿主类型 | `npm run build:check` | Client 与 Host 两个聚合检查通过 |
 | 原版隔离运行时与浏览器 | `node tools/harness-integration.mjs .harness/stock` | 6 项通过，使用真实官方 Agent、Team、持久化、Gateway 和 Chromium |
 | 无脚本安装产物 | `npm pack --ignore-scripts`，随后 `pnpm add <tgz> --ignore-scripts --offline` | 安装通过；使用安装目录运行同一套 6 项用例，全部通过 |
+| Git 安装产物 | `pnpm add git+file:///<repo>#a1e421b --ignore-scripts --offline` | 安装通过，产物与提交一致；6 项集成用例全部通过 |
+| Windows 原版 Desktop | 官方 `0.2.1-rc.3` / `be72761ee1a6736ebcdf4f3739363b083ae53c98` | 插件管理器从 GitHub `#v0.2.0` 安装、启用及重启通过 |
+
+## Windows Desktop 实机补充验收
+
+已恢复替换前保留的原版程序，仅恢复安装文件，没有回滚现有配置及历史。
+原版 `app.asar` 的 SHA-256 为
+`04B32E3A872826BA15CFB2081C6A929A8D4ECAA65E09A2543E5A6B30E2EFF1F0`；
+安装插件与测试后的回读校验值不变。
+
+通过 Desktop 插件管理器卸载旧插件，再安装
+`github:YaoGUanquan/ai-agent-engine-deepseek#v0.2.0`，
+显示版本 `0.2.0`，启用后正常重启。没有替换或修改原版安装包。
+
+新建有明确验收标题的测试会话，使用真实 `deepseek-account / deepseek-flash`
+完成简单回复，并实际创建 `backend`、`frontend` 两个官方 Team 队友，
+分别收到 `BACKEND_OK` 和 `FRONTEND_OK`。
+团队面板显示工程负责人、后端工程师、前端工程师。
+测试提示禁止读写工程文件；未要求或执行真实业务修改。
+
+右键删除确认框识别出两个所属队友，取消后完整保留。
+确认删除后，三份测试日志在磁盘上消失，公共会话列表移除，
+页面刷新及 Desktop 完整重启后均不再出现；删除身份记录已完成。
+删除对象仅为本次创建的测试树。
+
+本机补丁构建、测试版及备份的清理命令被执行策略拒绝。
+本记录不将磁盘清理标为完成，也不把它当作插件运行依赖。
 
 ## 对话删除
 
@@ -49,10 +76,12 @@ Standard 和可选工程 Preset 均能使用工程策略，默认 Preset 不变�
 
 ## 证据边界
 
-以上使用原版宿主源码构建及隔离浏览器运行时，不等同于各平台 Desktop
-安装包实装验收。未替换用户的日常 Desktop，未删除真实历史或改写现有 profile。
-模型响应为脚本化合成数据，未调用付费模型，不能证明任意真实模型的角色选择。
+自动化测试使用原版宿主源码构建及隔离浏览器运行时；上文另记录了
+Windows 原版 Desktop 与真实 DeepSeek Flash 的实机补充验证。
+未删除既有真实历史；仅按授权更新了插件安装来源和启用配置。
+其他平台 Desktop 安装包及任意其他模型的角色选择仍未验收。
 
 安装包随附 `lib/`，不包含宿主补丁及应用补丁工具。
 Git 提交、标签、隔离安装及远端发布状态以本次交付结果为准。
-这份记录不代表官方全量回归、真实模型联调或远端发布已经完成。
+`main` 与 `v0.2.0` 已推送 GitHub，远端回读确认标签指向 `a1e421b`。
+这份记录不代表官方全量回归或所有平台、所有模型均已验收。
