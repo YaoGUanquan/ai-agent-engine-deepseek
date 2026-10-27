@@ -12,7 +12,7 @@ assert.equal(pkg.engines.dsh, '0.2.1-rc.3')
 assert.ok(!pkg.files.some(path => path.startsWith('.harness')))
 const patch = parseDocument(readFileSync('cordis.patch.yml', 'utf8'), { uniqueKeys: true })
 assert.equal(patch.errors.length, 0)
-const publicPaths = ['src', 'tools', 'prompts', 'compat', 'tests', 'README.md', 'CHANGELOG.md', 'NOTICE.md', 'LICENSE', 'COPYING', 'package.json', 'package-lock.json', 'cordis.patch.yml']
+const publicPaths = ['src', 'tools', 'prompts', 'compat', 'tests', 'README.md', 'CHANGELOG.md', 'NOTICE.md', 'LICENSE', 'package.json', 'package-lock.json', 'cordis.patch.yml']
 if (existsSync('lib')) publicPaths.push('lib')
 while (publicPaths.length) {
   const path = publicPaths.pop()

@@ -1,29 +1,45 @@
-# Notices
+# 来源与第三方声明
 
-AI Agent Engine for DeepSeek Harness is distributed under GPL-2.0-only.
-The seven engineering skills were adapted from AI Agent Engine for Codex 0.5.0,
-YaoGUanquan/codex-ai-agent-engine, commit
-268b633edb17aa3770a7964a68afb1a559058bdd. The original project credits
-jiangqiang1996/ai-agent-engine for its capability organization and independently
-implements the instructions.
+本项目以 GPL-2.0-only 分发，完整许可证见 [LICENSE](LICENSE)。
 
-The compatibility patch modifies DeepSeek Harness, Copyright DeepSeek,
-distributed under the MIT license. Its fixed upstream commit is
-1f81c047fc48fa190a683e469daa699857e9afe8. The patch contains upstream context
-under that license; see compat/harness/LICENSE.upstream.
+## 直接参考项目
 
-The plugin's JSONL directory encoding follows the same upstream revision.
-The browser bundle includes Zod under the MIT license; see licenses/zod.txt.
+本项目基于 [AI Agent Engine for Codex](https://github.com/YaoGUanquan/codex-ai-agent-engine)
+的工程技能设计，适配 DeepSeek Harness 的原生插件和 Agent Teams。
+七项工程技能参考并改编自该项目的 `0.5.0` 版本，固定参考提交为
+`268b633edb17aa3770a7964a68afb1a559058bdd`。
 
-Role instructions are written for this plugin. Public Grok Bot marketplace
-descriptions and templates were consulted on 2026-10-27:
+Codex 版项目将 [jiangqiang1996/ai-agent-engine](https://gitee.com/jiangqiang1996/ai-agent-engine)
+列为能力划分的灵感来源，并声明其指令为独立实现。此处保留该历史来源，
+不将它描述为本插件的直接适配项目。
+
+## DeepSeek Harness
+
+插件运行时基于 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)
+的原生插件、Agent Teams 和持久化能力。JSONL 目录编码参考官方提交
+`1f81c047fc48fa190a683e469daa699857e9afe8`，上游版权归 DeepSeek，
+许可证为 MIT，全文见 [上游许可证](compat/harness/LICENSE.upstream)。
+
+`compat/harness` 保留了 `0.1.x` 使用的历史兼容补丁，其中包含 MIT
+许可的上游代码上下文。`0.2.0` 的插件安装包不包含该补丁，
+无需修改用户的 Desktop。
+
+## Zod
+
+浏览器构建产物包含 MIT 许可的 Zod，全文见 [Zod 许可证](licenses/zod.txt)。
+
+## 补充设计参考
+
+工程角色指令由本项目编写。2026-10-27 开发时也查阅过以下公开的
+Grok Bot 市场介绍与模板，作为任务分工和协作约定的补充参考：
 
 - Engineering Lead: https://x.ai/bot/marketplace/bots/engineering-lead
 - Lingxi's Engineer Bot: https://x.ai/bot/marketplace/bots/engineer-bot
 - Nightly Audit Engineer: https://x.ai/bot/marketplace/bots/nightly-audit-engineer
 - Projects Manager: https://x.ai/bot/marketplace/bots/projects-manager
 
-The adaptation uses task ownership, bounded delegation, evidence-based closure,
-reuse of teammates, and root-cause investigation. It does not reproduce the
-templates verbatim or include their external-board, routine, cloud-agent, merge,
-or deployment automations. No affiliation with xAI or DeepSeek is implied.
+采用的设计要点包括任务归属、限定委派范围、按证据验收、复用队友和根因调查。
+没有逐字复制这些模板，也没有引入其外部任务板、定时任务、云端代理、
+自动合并或自动部署机制。
+
+本项目不代表 DeepSeek 或 xAI，也不表示获得其官方背书。
