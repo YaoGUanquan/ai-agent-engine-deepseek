@@ -1,0 +1,9 @@
+- insert:
+    - id: ai-agent-engine-team-ui
+      name: '@deepseek-ai/dsh-experimental-client-ui-agent-team'
+    - id: ai-agent-engine
+      name: ai-agent-engine-deepseek
+      config:
+        engineering: true
+        conversationManagement: true
+        maxMembers: 8
