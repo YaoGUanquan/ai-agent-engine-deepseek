@@ -11,6 +11,10 @@ version.
 Use a separate official source checkout at the pinned commit. From this plugin's
 source directory, verify and then apply:
 
+Keep that checkout's source files in LF form, for example by cloning with
+`git -c core.autocrlf=false clone ...`. Checksums intentionally reject converted
+source bytes. This repository's `.gitattributes` keeps the delivered patch in LF.
+
 ```powershell
 node tools/harness-patch.mjs check "<harness-source-directory>"
 node tools/harness-patch.mjs apply "<harness-source-directory>"

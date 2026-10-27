@@ -38,7 +38,17 @@ npm pack
 dsh plugin --profile web add "<absolute-path-to-tarball>"
 ```
 
-桌面版使用自身插件管理器维护其 profile。不要手工改 `app.asar` 或覆盖应用依赖。源码补丁的应用、构建、隔离验证及安装边界见兼容性说明。
+Desktop 启动过一次、完成 profile 初始化后，完全退出应用，使用安装目录自带的 CLI：
+
+```powershell
+& "<Desktop-install-directory>\resources\runtime\cli\bin\dsh.cmd" plugin --profile desktop add "<absolute-path-to-tarball>"
+```
+
+安装后重新打开 Desktop，在 Preset 选择器中选择 **AI Agent Engine**。这条命令复用 Desktop 已有的数据位置，不设置新的 `DSH_HOME`。
+
+仓库不跟踪 `lib/`，因此从 Git 克隆后先执行上述构建和打包步骤，再安装本地 `.tgz`；本版没有提供 Git 安装时的自动构建脚本。仅安装插件不会给宿主增加永久删除接口，完整右键删除功能仍需匹配的宿主源码补丁。
+
+桌面版也可使用自身插件管理器维护其 profile。不要手工改 `app.asar` 或覆盖应用依赖。源码补丁的应用、构建、隔离验证及安装边界见兼容性说明。
 
 `cordis.patch.yml` 中的插件配置：
 
