@@ -15,6 +15,7 @@
 | 原版宿主产物 | `npm run build:artifacts` | 7 个产物门禁通过 |
 | 原版宿主类型 | `npm run build:check` | Client 与 Host 两个聚合检查通过 |
 | 原版隔离运行时与浏览器 | `node tools/harness-integration.mjs .harness/stock` | 6 项通过，使用真实官方 Agent、Team、持久化、Gateway 和 Chromium |
+| 无脚本安装产物 | `npm pack --ignore-scripts`，随后 `pnpm add <tgz> --ignore-scripts --offline` | 安装通过；使用安装目录运行同一套 6 项用例，全部通过 |
 
 ## 对话删除
 
@@ -39,6 +40,8 @@
 Standard 和可选工程 Preset 均能使用工程策略，默认 Preset 不变。
 简单任务不会创建队友；两个真实 Team 成员同时运行；任务依赖未完成时不能认领。
 既有官方 Team bundle 的人数限制被保留，工程模块可独立关闭。
+另通过真正安装产物验证：官方 Team 服务仍在启动时，插件不会注册竞争服务。
+该场景不能仅用源码直连证明，因为独立安装的模块类身份与宿主不同。
 
 团队面板与任务负责人按职责显示，支持中英文切换，工具寻址标识不变。
 桌面及 390px 窄屏的角色面板、删除确认框已截图检查，

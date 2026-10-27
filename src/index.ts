@@ -29,8 +29,11 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
   ctx.plugin(ConversationDeletion, { enabled: () => config.conversationManagement.get() })
   if (!config.engineering) return
   installSkills(ctx)
-  // Reuse a Team service already installed by the official optional bundle.
-  if (!ctx.get('agentTeams')) ctx.plugin(TeamService, { maxMembers: config.maxMembers })
+  // A configured official service may still be starting. Its separately
+  // installed module cannot be deduplicated by class identity.
+  const configuredTeam = [...ctx.loader.entries()].some(entry =>
+    entry.options.name === '@deepseek-ai/dsh-experimental-agent-team' && !entry.disabled)
+  if (!ctx.get('agentTeams') && !configuredTeam) ctx.plugin(TeamService, { maxMembers: config.maxMembers })
   const standard = await ctx.agentPresets.readDocument('standard')
   const plugins: unknown = load(standard.content, { schema: entryListSchema })
   const problem = entryListProblem(plugins)
