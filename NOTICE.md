@@ -21,7 +21,7 @@ Codex 版项目将 [jiangqiang1996/ai-agent-engine](https://gitee.com/jiangqiang
 许可证为 MIT，全文见 [上游许可证](compat/harness/LICENSE.upstream)。
 
 `compat/harness` 保留了 `0.1.x` 使用的历史兼容补丁，其中包含 MIT
-许可的上游代码上下文。`0.2.0` 的插件安装包不包含该补丁，
+许可的上游代码上下文。当前插件安装包不包含该补丁，
 无需修改用户的 Desktop。
 
 ## Zod

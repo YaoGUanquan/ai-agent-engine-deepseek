@@ -4,7 +4,7 @@
 
 本项目参考 [AI Agent Engine for Codex](https://github.com/YaoGUanquan/codex-ai-agent-engine)，将其七项工程技能适配为 DeepSeek Harness 原生插件。
 
-[功能介绍](#功能介绍) · [安装](#安装) · [快速使用](#快速使用) · [常见问题](#常见问题) · [开发](#开发) · [更新记录](CHANGELOG.md)
+[功能介绍](#功能介绍) · [安装](#安装) · [更新与回退](#更新与回退) · [快速使用](#快速使用) · [常见问题](#常见问题) · [版本下载](https://github.com/YaoGUanquan/ai-agent-engine-deepseek/releases)
 
 ## 功能介绍
 
@@ -23,7 +23,7 @@
 
 | 项目 | 当前支持范围 |
 | --- | --- |
-| 插件版本 | `0.2.0` |
+| 插件版本 | `0.2.1` |
 | DeepSeek Harness | `0.2.1-rc.3` |
 | Desktop 实机验证 | Windows 原版 Desktop |
 
@@ -37,12 +37,52 @@
 4. 完全退出并重新打开 Desktop。
 
 ```text
-github:YaoGUanquan/ai-agent-engine-deepseek#v0.2.0
+github:YaoGUanquan/ai-agent-engine-deepseek#v0.2.1
 ```
 
 安装包已包含构建产物。普通用户无需安装 Node.js、执行脚本或构建源码，也无需替换 Desktop。
 
-已经安装旧版时，先在插件页卸载旧版，再按上述步骤安装。卸载插件不会替你删除已有对话。
+已经安装旧版时，按下文的[更新步骤](#更新与回退)操作。
+
+### 下载安装包
+
+也可以打开 [Releases](https://github.com/YaoGUanquan/ai-agent-engine-deepseek/releases/latest)，下载 `ai-agent-engine-deepseek-0.2.1.tgz`，在插件管理器的“包名或地址”中填写该文件的绝对路径，再安装、启用并重启。
+
+每个 Release 都提供版本说明、兼容范围和 `SHA256SUMS.txt` 校验文件。普通用户选择 `.tgz` 插件包即可；GitHub 自动生成的 “Source code” 是源码归档，供开发者使用。
+
+## 更新与回退
+
+### 能直接在插件里点击更新吗？
+
+当前适配的 Harness `0.2.1-rc.3` 仅为按需安装的官方插件提供“更新”入口。此插件属于第三方插件，**目前需要在插件页先卸载旧版，再安装新版**，没有自动下载或静默升级功能。
+
+安装地址中的 `#v0.2.1` 表示固定版本。重新启动 Desktop 不会自动变成未来的新版本。
+
+### 如何升级
+
+1. 打开[最新版本页面](https://github.com/YaoGUanquan/ai-agent-engine-deepseek/releases/latest)，查看更新内容和兼容的 Harness 版本。
+2. 等待相关任务结束，记录你自定义过的插件配置。
+3. 在 **插件** 页打开 `ai-agent-engine-deepseek`，点击 **卸载**。
+4. 点击 **添加插件**，填写新版本页面提供的安装地址。
+5. 安装并启用后，完全退出并重新打开 Desktop，再核对版本和配置。
+
+例如，从 `0.2.0` 升级到当前版本时填写：
+
+```text
+github:YaoGUanquan/ai-agent-engine-deepseek#v0.2.1
+```
+
+卸载插件不会替你删除已有对话。更新期间也不需要移除 Harness 的会话目录、记忆或项目文件。
+
+### 如何回退
+
+先卸载当前插件，再用已发布的旧版本地址安装。例如回到 `0.2.0`：
+
+```text
+github:YaoGUanquan/ai-agent-engine-deepseek#v0.2.0
+```
+
+启用后重启 Desktop。回退只切换插件版本，不会恢复已经永久删除的对话。
 
 ## 快速使用
 
@@ -127,7 +167,7 @@ github:YaoGUanquan/ai-agent-engine-deepseek#v0.2.0
 
 ### 当前版本验证过哪些功能？
 
-已通过类型检查、19 项单元测试和 6 项隔离集成测试。Windows 原版 Desktop 中还验证了 GitHub 安装、真实模型创建前后端队友、角色显示，以及删除后刷新和重启不再出现。
+`0.2.1` 发布检查包括类型检查、19 项单元测试及 6 项安装包隔离集成测试。Windows 原版 Desktop 的实机验证来自运行逻辑相同的 `0.2.0`，覆盖 GitHub 安装、真实模型创建前后端队友、角色显示，以及删除后刷新和重启不再出现。
 
 详细环境、检查结果和未验证范围见[验收记录](compat/harness/VALIDATION.md)。
 
@@ -143,7 +183,7 @@ npm run check:all
 npm pack
 ```
 
-构建后可在 Desktop 插件管理器中安装生成的 `ai-agent-engine-deepseek-0.2.0.tgz`。提交源码变更时应同步构建产物 `lib/`，保证 Git 地址安装可直接使用。
+构建后可在 Desktop 插件管理器中安装生成的 `ai-agent-engine-deepseek-0.2.1.tgz`。提交源码变更时应同步构建产物 `lib/`，保证 Git 地址安装可直接使用。
 
 使用未修改的官方 Harness 源码运行集成验收：
 
