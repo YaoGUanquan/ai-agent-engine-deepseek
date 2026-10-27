@@ -1,5 +1,9 @@
 # Harness compatibility patch
 
+This is the historical 0.1.x compatibility implementation. Version 0.2.0
+provides deletion inside the plugin and does not require this patch or a
+custom Desktop build. The commands below are retained only to reproduce 0.1.x.
+
 This source patch targets `deepseek-ai/deepseek-harness`, tag
 `dsh-v0.2.1-rc.3`, commit `1f81c047fc48fa190a683e469daa699857e9afe8`.
 The manifest records every original source checksum. A version label alone is

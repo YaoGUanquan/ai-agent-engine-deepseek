@@ -9,6 +9,7 @@ export interface DeletionState {
   readonly preview?: SessionDeletionPreview
   readonly unavailable?: boolean
   readonly changedScope?: boolean
+  readonly restartRequired?: boolean
 }
 
 /** Own a single confirmation request independently of the row-menu lifetime. */
@@ -53,10 +54,12 @@ export function createDeletionController(remote: Partial<SessionDeletionRemote>,
     } catch (error: unknown) {
       // Keep the exact preview so a partially committed cleanup can be retried.
       const changedScope = typeof error === 'object' && error !== null
-        && 'code' in error && error.code === 'session/delete-scope-changed'
+        && 'code' in error && (error.code === 'session/delete-scope-changed' || error.code === 'ae-conversations/delete-scope-changed')
+      const restartRequired = typeof error === 'object' && error !== null
+        && 'code' in error && error.code === 'ae-conversations/delete-restart-required'
       if (!disposed) state.set(changedScope
         ? { sessionId: current.sessionId, displayTitle: current.displayTitle, phase: 'error', changedScope: true }
-        : { ...current, phase: 'error' })
+        : { ...current, phase: 'error', restartRequired })
     }
   }
   function close() {

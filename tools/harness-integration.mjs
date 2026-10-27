@@ -6,7 +6,7 @@ import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 
 const root = fileURLToPath(new URL('../', import.meta.url))
-const upstream = resolve(process.argv[2] ?? resolve(root, '.harness/upstream'))
+const upstream = resolve(process.argv[2] ?? resolve(root, '.harness/stock'))
 const integration = resolve(upstream, '.ae-integration')
 mkdirSync(integration, { recursive: true })
 const target = resolve(integration, 'ae-plugin.e2e.ts')
@@ -30,7 +30,7 @@ const child = spawn(process.execPath, [
   ...process.argv.slice(3),
 ], {
   cwd: upstream,
-  env: { ...process.env, AE_PLUGIN_ROOT: root, AE_HARNESS_SOURCE: upstream, DSH_SNAPSHOT: 'replay', TEMP: temporary, TMP: temporary },
+  env: { ...process.env, AE_PLUGIN_ROOT: process.env.AE_PLUGIN_INSTALL_ROOT ?? root, AE_HARNESS_SOURCE: upstream, DSH_SNAPSHOT: 'replay', TEMP: temporary, TMP: temporary },
   stdio: 'inherit',
 })
 child.once('error', error => { console.error(error.message); process.exitCode = 1 })

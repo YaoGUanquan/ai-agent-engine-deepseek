@@ -12,6 +12,9 @@ distributed under the MIT license. Its fixed upstream commit is
 1f81c047fc48fa190a683e469daa699857e9afe8. The patch contains upstream context
 under that license; see compat/harness/LICENSE.upstream.
 
+The plugin's JSONL directory encoding follows the same upstream revision.
+The browser bundle includes Zod under the MIT license; see licenses/zod.txt.
+
 Role instructions are written for this plugin. Public Grok Bot marketplace
 descriptions and templates were consulted on 2026-10-27:
 

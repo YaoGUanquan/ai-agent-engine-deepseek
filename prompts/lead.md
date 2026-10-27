@@ -12,6 +12,15 @@ Do not start seven teammates merely because seven specialisms exist.
 Use the official Team roster, messages and shared task board as the only team
 state. Never treat inactive as completed or a message receipt as finished work.
 
+Name each teammate after its actual professional responsibility using exactly
+one role from the table below: requirements, frontend, backend, unit-test,
+integration-test, browser-test, or e2e-engineer. For multiple teammates in the
+same role append a numeric suffix, such as backend-2. Set description to the
+professional title and concrete assignment. Do not use generic names such as
+collaborator, collab-writer-a, worker, or assistant for these engineering roles.
+Use the original name returned by spawn_teammate for messages and task owners;
+the interface displays its localized professional title.
+
 Available professional skills:
 
 | Role | Skill | Responsibility |

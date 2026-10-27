@@ -1,0 +1,27 @@
+export declare const en: {
+    readonly 'role.lead': "Engineering lead";
+    readonly 'role.requirements': "Requirements analyst";
+    readonly 'role.frontend': "Frontend engineer";
+    readonly 'role.backend': "Backend engineer";
+    readonly 'role.unit-test': "Unit test engineer";
+    readonly 'role.integration-test': "Integration test engineer";
+    readonly 'role.browser-test': "Browser test engineer";
+    readonly 'role.e2e-engineer': "E2E test engineer";
+    readonly delete: "Permanently delete";
+    readonly title: "Permanently delete conversation?";
+    readonly description: "This conversation and its owned teammate conversations will be permanently deleted. Independent forks and project files are retained.";
+    readonly conversation: "Conversation";
+    readonly related: "Related teammate conversations";
+    readonly running: "Running conversations will be stopped before deletion.";
+    readonly loading: "Checking conversation scope...";
+    readonly pending: "Stopping activity and deleting...";
+    readonly cancel: "Cancel";
+    readonly close: "Close";
+    readonly retry: "Check again";
+    readonly unsupported: "Permanent deletion is unavailable for this storage backend.";
+    readonly restart: "Restart Desktop once after enabling the plugin, then retry deletion.";
+    readonly failed: "Deletion did not complete. The Host may have committed part of the cleanup; retry this operation.";
+    readonly changed: "The conversation family changed. Check the scope again and confirm the updated list.";
+};
+export declare const zh: Record<keyof typeof en, string>;
+export type LocaleKey = keyof typeof en;

@@ -8,6 +8,8 @@ import { entryListSchema } from '@deepseek-ai/cordis-plugin-include'
 import { load } from 'js-yaml'
 import type { Config as PluginConfig } from './types.ts'
 import { installSkills } from './skills.ts'
+import * as engineering from './engineering.ts'
+import { ConversationDeletion } from './conversation-deletion.ts'
 
 export const name = 'ai-agent-engine'
 export const inject = ['loader', 'agentPresets', 'agents', 'sessions', 'sessionPersistence', 'sessionProjections', 'subagents', 'skills']
@@ -24,6 +26,7 @@ export const Config = z.object({
 
 /** Install an optional native preset without changing the selected default. */
 export async function apply(ctx: Context, config: Config): Promise<void> {
+  ctx.plugin(ConversationDeletion, { enabled: () => config.conversationManagement.get() })
   if (!config.engineering) return
   installSkills(ctx)
   // Reuse a Team service already installed by the official optional bundle.
@@ -34,13 +37,13 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
   if (problem) throw new Error(`The Standard preset cannot be used as the engineering base: ${problem}`)
   const globalTeamTools = [...ctx.loader.entries()].some(entry =>
     entry.options.name === '@deepseek-ai/dsh-experimental-tool-agent-team' && !entry.disabled)
+  ctx.plugin(engineering, { teamTools: !globalTeamTools })
   ctx.plugin(AgentPreset, {
     id: 'ai-agent-engine',
     name: 'AI Agent Engine',
     description: '按需组队的工程协作：需求、前后端实现与分层验证。',
     plugins: [
       ...plugins as PresetDefinition['plugins'],
-      { name: 'ai-agent-engine-deepseek/engineering', config: { teamTools: !globalTeamTools } },
     ],
   })
 }

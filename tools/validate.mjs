@@ -7,11 +7,13 @@ const expected = ['ae-grill', 'ae-frontend', 'ae-backend', 'ae-unit-test', 'ae-i
 assert.deepEqual(readdirSync('skills').sort(), expected)
 const pkg = JSON.parse(readFileSync('package.json', 'utf8'))
 assert.equal(pkg.license, 'GPL-2.0-only')
+assert.equal(pkg.version, '0.2.0')
 assert.equal(pkg.engines.dsh, '0.2.1-rc.3')
 assert.ok(!pkg.files.some(path => path.startsWith('.harness')))
 const patch = parseDocument(readFileSync('cordis.patch.yml', 'utf8'), { uniqueKeys: true })
 assert.equal(patch.errors.length, 0)
-const publicPaths = ['src', 'tools', 'prompts', 'compat', 'tests', 'README.md', 'NOTICE.md', 'LICENSE', 'COPYING', 'package.json', 'package-lock.json', 'cordis.patch.yml']
+const publicPaths = ['src', 'tools', 'prompts', 'compat', 'tests', 'README.md', 'CHANGELOG.md', 'NOTICE.md', 'LICENSE', 'COPYING', 'package.json', 'package-lock.json', 'cordis.patch.yml']
+if (existsSync('lib')) publicPaths.push('lib')
 while (publicPaths.length) {
   const path = publicPaths.pop()
   if (statSync(path).isDirectory()) {
@@ -53,13 +55,5 @@ for (const name of expected) {
   assert.equal(metadata.toJS().name, name)
   assert.ok(existsSync(resolve(root, 'references/teammate.md')))
 }
-const upstream = '.harness/upstream/packages/api/session-controller/src/types.ts'
-if (existsSync(upstream)) {
-  const host = readFileSync(upstream, 'utf8')
-  const client = readFileSync('src/deletion-contract.ts', 'utf8')
-  for (const name of ['SessionDeletionPreview', 'SessionDeletionRequest']) {
-    const declaration = new RegExp(`export interface ${name}[^\\{]*\\{[^}]*\\}`, 's')
-    assert.equal(host.match(declaration)?.[0], client.match(declaration)?.[0], `Deletion interface drift: ${name}`)
-  }
-}
-console.log('Validated seven skills, public content and encoding, module configuration, and deletion interface.')
+assert.ok(!pkg.files.some(path => path.endsWith('.patch') || path === 'compat/'))
+console.log('Validated version, seven skills, public content and encoding, and plugin-only package contents.')

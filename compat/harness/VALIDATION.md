@@ -1,61 +1,55 @@
-# 本地验收记录
+# 0.2.0 本地验收记录
 
 日期：2026-10-27。环境：Windows、Node.js 24.18.0。
-基线为 `dsh-v0.2.1-rc.3` / `1f81c047fc48fa190a683e469daa699857e9afe8`，
-叠加本目录补丁；补丁及原文件校验值见 `manifest.json`。
+
+本次使用独立克隆的官方 `dsh-v0.2.1-rc.3`，提交
+`1f81c047fc48fa190a683e469daa699857e9afe8`，未应用 `compat/harness`
+中的历史补丁。测试启动时额外断言宿主没有 `agents.disposeForDeletion`、
+`sessions.reserveDeletion` 和 `sessionPersistence.deleteSessions`。
 
 ## 已执行的检查
 
 | 层次 | 检查 | 结果 |
 | --- | --- | --- |
-| 插件静态与构建 | `npm run check:all` | 双面类型检查、七技能资源、公开内容与编码检查通过；10 项测试通过；构建通过 |
-| 宿主源码 | `npm run build:artifacts`，随后 `npm run build:check` | 7 个产物门禁和 2 个聚合检查通过 |
-| 宿主聚焦回归 | 以下 8 个测试文件 | 482 项通过 |
-| 隔离运行时与浏览器 | `node tools/harness-integration.mjs "<harness-source>"` | 5 项通过，使用官方 profile、Agent Teams、Remote 和 Chromium |
-| 补丁交付 | `npm run patch:check`，再应用到独立基线副本 | 25 个补丁目标与已验收源码逐字节一致 |
+| 插件静态与构建 | `npm run check:all` | Host/Client 类型检查、七技能与公开内容校验、19 项单元测试、构建通过 |
+| 原版宿主产物 | `npm run build:artifacts` | 7 个产物门禁通过 |
+| 原版宿主类型 | `npm run build:check` | Client 与 Host 两个聚合检查通过 |
+| 原版隔离运行时与浏览器 | `node tools/harness-integration.mjs .harness/stock` | 6 项通过，使用真实官方 Agent、Team、持久化、Gateway 和 Chromium |
 
-宿主聚焦回归文件：
+## 对话删除
 
-```text
-packages/core/agent-loop/tests/inbox.spec.ts
-packages/api/session-controller/tests/deletion.spec.ts
-packages/session-query/session-query-sqlite/tests/sqlite.spec.ts
-packages/session/session-persistence-jsonl/tests/jsonl.spec.ts
-packages/session/session-persistence-jsonl/tests/deletion.spec.ts
-packages/experimental/agent-team/tests/team.spec.ts
-packages/client/ui-workspace/tests/rows.client.spec.tsx
-packages/client/ui-workspace/tests/workspaces-service.client.spec.ts
-```
+浏览器覆盖当前打开、归档及包含两个运行中队友的主对话。右键不改变当前选择，
+取消保留数据，确认停止任务并删除所属子会话。删除后投影缓存与搜索结果移除，
+第二客户端同步更新，页面刷新后不再出现。独立分叉仍能读取继承的历史。
 
-## 验证范围
+测试还把删除前的合成记录和未完成的已提交删除日志放入新的独立 Host 数据目录，
+重新启用插件，验证初始化完成清理、日志文件消失、旧身份恢复被拒绝，
+独立分叉仍被保留。只等待 Loader 并不足以证明子服务已初始化；
+恢复测试额外等待删除服务实际可用。
 
-隔离 profile 的实际安装组合验证了默认 Standard Preset 保持不变、工程 Preset
-可选、七技能可用、工程模块关闭，以及复用已安装官方 Team bundle 的人数限制。
-对话模块通过官方实时设置开关控制菜单，工程模块仍可使用。
+接口验证所有者限制、明确确认、伪造范围拒绝、晚创建子会话导致确认过期、
+并发确认、首次启用前已存在 Agent 的生命周期保护，以及删除中卸载时先排空操作再恢复接口。
+首次安装后需要正常重启一次 Desktop，无需定制构建。
 
-浏览器使用脚本化模型响应驱动真实运行时：简单任务不创建队友；两个队友同时运行；
-官方任务板拒绝认领依赖未完成的任务，前置完成后允许继续。
-这验证了运行时和封装，没有证明真实模型会在任意任务中正确选择角色。
+禁用搜索时的索引清理另有 SQLite 测试：只删除指定身份，保留无关记录；
+不认识的数据库被拒绝且内容不变。
 
-浏览器验证了当前打开、归档及包含运行队友的对话删除，右键不改变当前选择，
-取消后保留数据，删除后刷新不再出现，以及第二客户端同步移除。
-独立分叉实际继承了主对话历史，删除后仍可通过历史读取接口读取。
-确认框已检查桌面和 390px 窄屏布局；截图保存在本地 `output/playwright/`。
+## 工程协作
 
-源码回归覆盖范围变化、伪造范围、权限拒绝、不支持的存储、重复提交、
-投递与创建阻断、停止失败、停止超时、锁冲突、部分清理失败与重试。
-持久化重启拒绝复活已删身份；SQLite 在搜索禁用时也会恢复已提交删除，
-且清理不读取无关会话正文。队友失败、中断、恢复和 fork 由官方 Team 回归覆盖。
+Standard 和可选工程 Preset 均能使用工程策略，默认 Preset 不变。
+简单任务不会创建队友；两个真实 Team 成员同时运行；任务依赖未完成时不能认领。
+既有官方 Team bundle 的人数限制被保留，工程模块可独立关闭。
 
-## 未通过或未执行
+团队面板与任务负责人按职责显示，支持中英文切换，工具寻址标识不变。
+桌面及 390px 窄屏的角色面板、删除确认框已截图检查，
+截图在本地 `output/playwright/`，不包含于安装包。
 
-扩展工作区与缓存回归曾有 3 项在 Windows 创建 symlink 时因 `EPERM` 失败。
-没有修改断言或放宽权限来掩盖这些失败；本记录不代表官方全量测试通过。
+## 证据边界
 
-`npm audit --omit=dev` 报告 33 项高危、0 项严重告警，来自当前固定依赖链；
-完整开发依赖审计还包含严重告警。未执行破坏固定版本约束的自动升级。
+以上使用原版宿主源码构建及隔离浏览器运行时，不等同于各平台 Desktop
+安装包实装验收。未替换用户的日常 Desktop，未删除真实历史或改写现有 profile。
+模型响应为脚本化合成数据，未调用付费模型，不能证明任意真实模型的角色选择。
 
-未调用真实付费模型；真实模型的角色选择与工具调用仍待联调。
-未验收本机另一构建提交的 Desktop 安装包，未生成或替换正式 Desktop 安装。
-未删除真实历史，未改变用户现有 profile、默认 Preset 或 D 盘存储配置。
-验收不包含 Git 推送或部署；Git 交付状态以仓库当前提交为准，不作生产发布通过的结论。
+安装包随附 `lib/`，不包含宿主补丁及应用补丁工具。
+Git 提交、标签、隔离安装及远端发布状态以本次交付结果为准。
+这份记录不代表官方全量回归、真实模型联调或远端发布已经完成。

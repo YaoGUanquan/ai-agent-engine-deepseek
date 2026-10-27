@@ -13,6 +13,8 @@ const baseline = ['react', 'react-dom', 'react/jsx-runtime', '@deepseek-ai/cordi
 await build({
   entryPoints: ['src/client.tsx'], outfile: 'lib/client.js', bundle: true,
   format: 'cjs', platform: 'browser', target: 'es2022',
+  // Preserve bundled string values without multiline trailing whitespace.
+  supported: { 'template-literal': false },
   external: [...baseline, ...pkg.dsh.client.external],
   banner: { js: 'window.__ModuleLoader__.load({id:"ai-agent-engine-deepseek",factory:(require)=>{var module={exports:{}};var exports=module.exports;' },
   footer: { js: 'return module.exports;}});' },

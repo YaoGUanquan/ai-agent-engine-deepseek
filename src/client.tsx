@@ -1,4 +1,5 @@
 import type { Context } from '@deepseek-ai/cordis'
+import { useEffect, useRef } from 'react'
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
@@ -9,17 +10,20 @@ import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { SettingsDescribeFace } from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { PropsHooks, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { Button, IconTrashOutlineRegular, MenuItemButton, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { SessionDeletionRemote } from './deletion-contract.ts'
+import type {} from './deletion-contract.ts'
 import { createDeletionController } from './deletion-state.ts'
 import { en, zh, type LocaleKey } from './locales.ts'
 import { conversationManagementEnabled } from './module-config.ts'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import { installTeamPresentation } from './team-presentation.tsx'
+import { deletionRpc } from './deletion-rpc.ts'
+import { attachRowContextMenu } from './row-context-menu.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap { 'ai-agent-engine': LocaleKey }
 }
 
-export const inject = ['slots', 'locale', 'remote', 'remote.session', 'configForms']
+export const inject = ['slots', 'locale', 'remote', 'remote.session', 'configForms', 'sessions', 'uiWorkspace']
 
 type Controller = ReturnType<typeof createDeletionController>
 type ModuleProps = PropsHooks<{ settings: SettingsDescribeFace }>
@@ -32,10 +36,21 @@ function DeleteMenuItem({ sessionId, displayTitle, useMenuOpenState, useSettings
   const [, setOpen] = useMenuOpenState()
   const enabled = useSettings(conversationManagementEnabled)
   if (!enabled) return null
-  return <MenuItemButton icon={<IconTrashOutlineRegular size={14} />} danger separatorBefore onSelect={() => {
+  return <MenuItemButton data-ae-delete-session={sessionId} icon={<IconTrashOutlineRegular size={14} />} danger separatorBefore onSelect={() => {
     setOpen(false)
     void requestDeletion(sessionId, displayTitle)
   }}>{t('delete')}</MenuItemButton>
+}
+
+type RowContextProps = PropsRuntime<'sidebar.workspaces.session.row.action'> & ModuleProps
+
+function RowContextMenu({ sessionId, useSettings }: RowContextProps) {
+  const marker = useRef<HTMLSpanElement>(null)
+  const enabled = useSettings(conversationManagementEnabled)
+  useEffect(() => {
+    if (enabled && marker.current) return attachRowContextMenu(marker.current, sessionId)
+  }, [enabled, sessionId])
+  return <span hidden ref={marker} data-ae-row-context={enabled ? 'enabled' : 'disabled'} />
 }
 
 type DeleteDialogProps = PropsRuntime<'shell.overlay'> & PropsLocale<'ai-agent-engine'>
@@ -64,21 +79,32 @@ export function DeletionDialog({ useDeletion, useSettings, confirm, close, reque
       {state.preview.runningSessionIds.length > 0 && <p>{t('running')}</p>}
     </>}
     {busy && <p role="status">{t('pending')}</p>}
-    {state.phase === 'error' && <p role="alert">{t(state.unavailable ? 'unsupported' : state.changedScope ? 'changed' : 'failed')}</p>}
+    {state.phase === 'error' && <p role="alert">{t(state.unavailable ? 'unsupported' : state.restartRequired ? 'restart' : state.changedScope ? 'changed' : 'failed')}</p>}
   </Modal>
 }
 
 /** Follow the shared Host settings mirror and register deletion controls. */
-export function apply(ctx: Context): void {
+export async function apply(ctx: Context): Promise<void> {
+  try { await mountClient(ctx) } catch (error) {
+    console.error('AI Agent Engine initialization failed:', error instanceof Error ? error.message : 'Unknown initialization error')
+    throw error
+  }
+}
+
+async function mountClient(ctx: Context): Promise<void> {
   ctx.locale.register('ai-agent-engine', { en, zh })
+  installTeamPresentation(ctx)
   const settings = ctx.configForms.describe()
-  // The Host patch supplies generated codecs; an unpatched Host rejects these
-  // optional methods before the confirmation can become actionable.
-  const remote = ctx.remote.session as typeof ctx.remote.session & SessionDeletionRemote
-  const controller = createDeletionController(remote, (_ids: readonly SessionId[]) => {
-    // The patched workspace navigation closes deleted selections in every
-    // connected client from the authoritative Session list removal.
-  })
+  await ctx.remote.$mount(deletionRpc)
+  const remote = ctx.get('remote.aeConversations')
+  if (!remote) throw new Error('AI Agent Engine conversation API namespace was not mounted')
+  const leaveDeleted = (ids: readonly SessionId[]) => {
+    if (ids.some(id => (ctx.sessions.retainInfo(id).getSnapshot().retainedBy.mainView ?? 0) > 0)) {
+      ctx.uiWorkspace.startSession()
+    }
+  }
+  ctx.remote.$on('api-session/removed', id => { leaveDeleted([id]) })
+  const controller = createDeletionController(remote, leaveDeleted)
   ctx.effect(() => () => controller.dispose())
   const requestDeletion: Controller['request'] = async (sessionId, title) => {
     if (conversationManagementEnabled(settings.getSnapshot())) await controller.request(sessionId, title)
@@ -87,6 +113,10 @@ export function apply(ctx: Context): void {
     name: 'sidebar.workspaces.session.menu.item', id: 'ai-agent-engine-delete', order: 500,
     locale: 'ai-agent-engine', inject: () => ({ hooks: { settings }, requestDeletion }),
   }, DeleteMenuItem))
+  ctx.slots.inject('sidebar.workspaces.session.row.action', () => ctx.slots.register({
+    name: 'sidebar.workspaces.session.row.action', id: 'ai-agent-engine-context-menu',
+    inject: () => ({ hooks: { settings } }),
+  }, RowContextMenu))
   ctx.slots.inject('shell.overlay', () => ctx.slots.register({
     name: 'shell.overlay', id: 'ai-agent-engine-delete', locale: 'ai-agent-engine',
     inject: () => ({
