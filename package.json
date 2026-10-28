@@ -8,14 +8,8 @@
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
   "exports": {
-    ".": {
-      "types": "./lib/index.d.ts",
-      "default": "./lib/index.js"
-    },
-    "./engineering": {
-      "types": "./lib/engineering.d.ts",
-      "default": "./lib/engineering.js"
-    },
+    ".": { "types": "./lib/index.d.ts", "default": "./lib/index.js" },
+    "./engineering": { "types": "./lib/engineering.d.ts", "default": "./lib/engineering.js" },
     "./client": "./lib/client.js",
     "./package.json": "./package.json"
   },
@@ -32,15 +26,10 @@
     "NOTICE.md",
     "README.md"
   ],
-  "engines": {
-    "node": ">=24",
-    "dsh": "0.2.1-rc.3"
-  },
+  "engines": { "node": ">=24", "dsh": "0.2.1-rc.3" },
   "dsh": {
     "manifestVersion": 1,
-    "bundle": {
-      "patch": "./cordis.patch.yml"
-    },
+    "bundle": { "patch": "./cordis.patch.yml" },
     "client": {
       "platform": "web",
       "inject": [
