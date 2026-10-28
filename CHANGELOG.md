@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.2 - 2026-10-28
+
+- 启动隔离修复（相对 0.2.1）：损坏的删除 journal 改为隔离（`.corrupt` 后缀）并记录日志，不再中断插件初始化；非 `session-persistence-jsonl` 后端改为软禁用删除能力，而不再在 initialize 时直接拒绝。
+- 插件版本号同步为 0.2.2；仍适配 Harness 0.2.1-rc.3。
+
 ## 0.2.1 - 2026-10-27
 
 - 提供正式 GitHub Release、可下载的插件安装包及 SHA-256 校验文件。

@@ -23,7 +23,7 @@
 
 | 项目 | 当前支持范围 |
 | --- | --- |
-| 插件版本 | `0.2.1` |
+| 插件版本 | `0.2.2` |
 | DeepSeek Harness | `0.2.1-rc.3` |
 | Desktop 实机验证 | Windows 原版 Desktop |
 
@@ -37,7 +37,7 @@
 4. 完全退出并重新打开 Desktop。
 
 ```text
-github:YaoGUanquan/ai-agent-engine-deepseek#v0.2.1
+github:YaoGUanquan/ai-agent-engine-deepseek#v0.2.2
 ```
 
 安装包已包含构建产物。普通用户无需安装 Node.js、执行脚本或构建源码，也无需替换 Desktop。
@@ -46,7 +46,7 @@ github:YaoGUanquan/ai-agent-engine-deepseek#v0.2.1
 
 ### 下载安装包
 
-也可以打开 [Releases](https://github.com/YaoGUanquan/ai-agent-engine-deepseek/releases/latest)，下载 `ai-agent-engine-deepseek-0.2.1.tgz`，在插件管理器的“包名或地址”中填写该文件的绝对路径，再安装、启用并重启。
+也可以打开 [Releases](https://github.com/YaoGUanquan/ai-agent-engine-deepseek/releases/latest)，下载 `ai-agent-engine-deepseek-0.2.2.tgz`，在插件管理器的“包名或地址”中填写该文件的绝对路径，再安装、启用并重启。
 
 每个 Release 都提供版本说明、兼容范围和 `SHA256SUMS.txt` 校验文件。普通用户选择 `.tgz` 插件包即可；GitHub 自动生成的 “Source code” 是源码归档，供开发者使用。
 
@@ -56,7 +56,7 @@ github:YaoGUanquan/ai-agent-engine-deepseek#v0.2.1
 
 当前适配的 Harness `0.2.1-rc.3` 仅为按需安装的官方插件提供“更新”入口。此插件属于第三方插件，**目前需要在插件页先卸载旧版，再安装新版**，没有自动下载或静默升级功能。
 
-安装地址中的 `#v0.2.1` 表示固定版本。重新启动 Desktop 不会自动变成未来的新版本。
+安装地址中的 `#v0.2.2` 表示固定版本。重新启动 Desktop 不会自动变成未来的新版本。
 
 ### 如何升级
 
@@ -69,7 +69,7 @@ github:YaoGUanquan/ai-agent-engine-deepseek#v0.2.1
 例如，从 `0.2.0` 升级到当前版本时填写：
 
 ```text
-github:YaoGUanquan/ai-agent-engine-deepseek#v0.2.1
+github:YaoGUanquan/ai-agent-engine-deepseek#v0.2.2
 ```
 
 卸载插件不会替你删除已有对话。更新期间也不需要移除 Harness 的会话目录、记忆或项目文件。
@@ -77,11 +77,11 @@ github:YaoGUanquan/ai-agent-engine-deepseek#v0.2.1
 ### 如何确认升级成功
 
 1. 在[最新版本页面](https://github.com/YaoGUanquan/ai-agent-engine-deepseek/releases/latest)确认最新正式版本号。
-2. 安装完成时，核对“已安装”提示中的版本；当前应为 `0.2.1`。
-3. 重启后，在 **插件** 页打开 `ai-agent-engine-deepseek`，核对版本、安装来源和启用状态；当前 GitHub 安装来源应包含 `#v0.2.1`。
+2. 安装完成时，核对“已安装”提示中的版本；当前应为 `0.2.2`。
+3. 重启后，在 **插件** 页打开 `ai-agent-engine-deepseek`，核对版本、安装来源和启用状态；当前 GitHub 安装来源应包含 `#v0.2.2`。
 4. 打开原有对话，确认历史仍可查看；已有自定义配置也应重新核对。
 
-插件版本 `0.2.1` 与 Harness 版本 `0.2.1-rc.3` 是两个不同的版本号。更新插件不会替你升级或替换 Desktop。
+插件版本 `0.2.2` 与 Harness 版本 `0.2.1-rc.3` 是两个不同的版本号。更新插件不会替你升级或替换 Desktop。
 
 如果重启后仍显示旧版，请先确认卸载、安装操作发生在当前正在使用的 Desktop 中，再检查是否还有旧的后台实例。只下载 `.tgz` 或只打开 Release 页面不会更新已安装插件。
 
@@ -178,7 +178,7 @@ github:YaoGUanquan/ai-agent-engine-deepseek#v0.2.0
 
 ### 当前版本验证过哪些功能？
 
-`0.2.1` 已通过类型检查、19 项单元测试及 6 项安装包隔离集成测试，并在 Windows 原版 Desktop 中验证了从 `0.2.0` 升级、重启加载，以及既有会话和配置保留。
+`0.2.2` 已通过类型检查、19 项单元测试及 6 项安装包隔离集成测试，并在 Windows 原版 Desktop 中验证了从 `0.2.0` 升级、重启加载，以及既有会话和配置保留。
 
 真实模型创建前后端队友、角色显示和永久删除功能的完整实机验收，来自运行文件完全相同的 `0.2.0`。升级验证没有重新删除用户已有对话。
 
@@ -196,7 +196,7 @@ npm run check:all
 npm pack
 ```
 
-构建后可在 Desktop 插件管理器中安装生成的 `ai-agent-engine-deepseek-0.2.1.tgz`。提交源码变更时应同步构建产物 `lib/`，保证 Git 地址安装可直接使用。
+构建后可在 Desktop 插件管理器中安装生成的 `ai-agent-engine-deepseek-0.2.2.tgz`。提交源码变更时应同步构建产物 `lib/`，保证 Git 地址安装可直接使用。
 
 使用未修改的官方 Harness 源码运行集成验收：
 
