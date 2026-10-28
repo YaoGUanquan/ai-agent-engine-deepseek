@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.2 - 2026-10-28
+
+- 启动隔离：损坏的删除记录（`.ai-agent-engine/deletions/*.json`）改名隔离为 `*.json.corrupt` 并打日志，不再抛错拖垮整插件。
+- 非 JSONL 会话持久化时降级关闭永久删除（RPC 返回 `delete-unsupported`），工程技能与其余能力照常加载。
+- 文档：安装/回退地址改为 `#v0.2.2`；README 补充上述行为说明。
+
 ## 0.2.1 - 2026-10-27
 
 - 提供正式 GitHub Release、可下载的插件安装包及 SHA-256 校验文件。
