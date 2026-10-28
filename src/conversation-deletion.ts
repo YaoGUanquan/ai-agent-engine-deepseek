@@ -63,6 +63,51 @@ function fingerprint(headers: readonly SessionHeader[]): string {
     [header.id, header.createdAt, header.cwd, header.parentSession, header.origin]))).digest('hex')
 }
 
+
+/** Whether the active session persistence can host conversation-deletion journals. */
+export function supportsConversationDeletionPersistence(
+  persistence: { name: string; config?: { root?: string } },
+): boolean {
+  return persistence.name === 'session-persistence-jsonl' && typeof persistence.config?.root === 'string'
+}
+
+function isValidDeletionRecord(record: DeletionRecord, filename: string): boolean {
+  return record.version === 1 && record.fingerprint === filename.slice(0, -5)
+    && typeof record.rootId === 'string' && typeof record.complete === 'boolean'
+    && Array.isArray(record.headers) && record.headers.length > 0
+    && record.headers.every(header => header && typeof header.id === 'string' && header.id.length > 0
+      && typeof header.createdAt === 'number' && (header.cwd === undefined || typeof header.cwd === 'string'))
+    && record.headers.some(header => header.id === record.rootId)
+    && fingerprint(record.headers) === record.fingerprint
+}
+
+/**
+ * Read one deletion journal. Corrupt or invalid files are renamed with a
+ * `.corrupt` suffix and skipped so plugin init can continue.
+ */
+export async function loadDeletionJournalFile(
+  directory: string,
+  filename: string,
+  log: (format: string, ...args: unknown[]) => void,
+): Promise<DeletionRecord | undefined> {
+  if (!/^[a-f0-9]{64}\.json$/.test(filename)) return undefined
+  const path = join(directory, filename)
+  try {
+    const record = JSON.parse(await readFile(path, 'utf8')) as DeletionRecord
+    if (!isValidDeletionRecord(record, filename)) throw new Error('Invalid conversation deletion record')
+    return record
+  } catch (error) {
+    const quarantine = `${path}.corrupt`
+    try {
+      await rename(path, quarantine)
+      log('Quarantined corrupt conversation deletion journal %s -> %s (%s)', filename, quarantine, error)
+    } catch (renameError) {
+      log('Failed to quarantine corrupt conversation deletion journal %s (%s); original error: %s', filename, renameError, error)
+    }
+    return undefined
+  }
+}
+
 /** Plugin-owned lifecycle and storage adapter; never changes installed host files. */
 export class ConversationDeletion extends TypertRemoteService {
   static inject = ['agents', 'sessions', 'sessionPersistence', 'sessionQuery', 'storageDomain', 'workspaceRegistry', 'typert', 'remoteAccess']
@@ -79,6 +124,7 @@ export class ConversationDeletion extends TypertRemoteService {
   private ready: Promise<void>
   private readonly active = new Set<Promise<readonly SessionId[]>>()
   private closing = false
+  private unsupported = false
 
   constructor(ctx: Context, private readonly config: { enabled: () => boolean }) {
     super(ctx, 'aeConversations')
@@ -94,10 +140,12 @@ export class ConversationDeletion extends TypertRemoteService {
   private async initialize(): Promise<void> {
     const ctx = this.ctx
     const persistence = ctx.sessionPersistence as SessionPersistence & { name: string; config?: { root?: string } }
-    if (persistence.name !== 'session-persistence-jsonl' || typeof persistence.config?.root !== 'string') {
-      reject('This storage backend is not supported by conversation deletion', 'ae-conversations/delete-unsupported')
+    if (!supportsConversationDeletionPersistence(persistence)) {
+      this.unsupported = true
+      ctx.logger.warn('Conversation deletion disabled: storage backend is not session-persistence-jsonl with a configured root')
+      return
     }
-    this.root = resolve(persistence.config.root)
+    this.root = resolve(persistence.config!.root!)
     this.directory = join(this.root, '.ai-agent-engine', 'deletions')
     await mkdir(this.directory, { recursive: true, mode: 0o700 })
     const remember = async (operation: Promise<AgentHandle>, id: SessionId, parent?: SessionId): Promise<AgentHandle> => {
@@ -158,17 +206,10 @@ export class ConversationDeletion extends TypertRemoteService {
       return owner.blocked(id as SessionId) ? Promise.resolve() : original.call(this, id, value)
     }))
     for (const filename of await readdir(this.directory)) {
-      if (!/^[a-f0-9]{64}\.json$/.test(filename)) continue
-      const record = JSON.parse(await readFile(join(this.directory, filename), 'utf8')) as DeletionRecord
-      if (record.version !== 1 || record.fingerprint !== filename.slice(0, -5)
-        || typeof record.rootId !== 'string' || typeof record.complete !== 'boolean'
-        || !Array.isArray(record.headers) || record.headers.length === 0
-        || !record.headers.every(header => header && typeof header.id === 'string' && header.id.length > 0
-          && typeof header.createdAt === 'number' && (header.cwd === undefined || typeof header.cwd === 'string'))
-        || !record.headers.some(header => header.id === record.rootId)
-        || fingerprint(record.headers) !== record.fingerprint) {
-        throw new Error('Invalid conversation deletion record')
-      }
+      const record = await loadDeletionJournalFile(this.directory, filename, (format, ...args) => {
+        ctx.logger.warn(format, ...args)
+      })
+      if (!record) continue
       for (const header of record.headers) this.deleted.add(header.id)
       if (!record.complete) {
         const locks: SessionHandle[] = []
@@ -218,6 +259,7 @@ export class ConversationDeletion extends TypertRemoteService {
   @Remote('deletePreview')
   async deletePreview(request: { sessionId: SessionId }): Promise<SessionDeletionPreview> {
     await this.ready
+    if (this.unsupported) reject('This storage backend is not supported by conversation deletion', 'ae-conversations/delete-unsupported')
     if (!request || typeof request.sessionId !== 'string' || !request.sessionId) reject('Invalid conversation identity')
     this.authorize([request.sessionId])
     const headers = await this.collect(request.sessionId)
@@ -234,6 +276,7 @@ export class ConversationDeletion extends TypertRemoteService {
   @Remote('delete')
   async delete(request: SessionDeletionRequest): Promise<readonly SessionId[]> {
     await this.ready
+    if (this.unsupported) reject('This storage backend is not supported by conversation deletion', 'ae-conversations/delete-unsupported')
     const operation = this.performDeletion(request)
     this.active.add(operation)
     try { return await operation } finally { this.active.delete(operation) }
