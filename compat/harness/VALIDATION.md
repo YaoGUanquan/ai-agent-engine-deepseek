@@ -1,5 +1,31 @@
 # 本地验收记录
 
+## 2026-10-30：rc.5 兼容修复
+
+当前源码的 `engines.dsh`、DSH peer、运行及开发依赖均固定为
+`0.2.1-rc.5`。旧版 `dsh-agent-preset` 会遮蔽宿主内置预设并被兼容性检查
+拒绝，造成 `Unknown agent preset: standard` 和角色 RPC 定义撤回；
+此次同步依赖消除了该启动失败，没有添加版本豁免。
+
+- `npm run check:all`：Host/Client 类型、公开内容校验、39 项单元测试及构建通过。
+- 未修改的官方 `dsh-v0.2.1-rc.5`，提交
+  `b830ec950faba0a46dda564be3e2d854afed94f1`：`npm run build:artifacts`
+  的 7 项门禁及 `npm run build:check` 的 2 项类型检查通过；
+  `npm run test:stock` 的 8 项真实宿主/Chromium 集成用例通过。
+- 最终 `.tgz` 使用 `npm install --ignore-scripts` 安装到独立目录后，
+  对该安装产物运行同一套 rc.5 集成用例，8 项通过。
+  直接把 Desktop profile 目录接入隔离宿主的尝试因缺少 Desktop 加载器提供的
+  Cordis peer 而失败，不能作为可移植安装环境；没有为此修改实际 profile。
+- 集成用例使用官方兼容性检查器验证 rc.5 无豁免通过，其他未声明版本被拒绝；
+  测试入口也会在启动前拒绝版本不匹配的官方源码目录。
+- Windows 原版 Desktop rc.5：通过安装自带的官方 CLI 卸载旧插件、安装本地新构建，
+  完整重启后主插件及团队界面组件均为 active，标准预设及工程预设均可读取。
+  “工程角色”页显示 7 项角色，无错误提示；四项 DSH 运行依赖回读均为 rc.5。
+- 实机验证后恢复普通启动，临时调试端口已关闭，没有新增崩溃日志。
+  本次未调用付费模型或删除既有对话；删除验收使用隔离集成环境。
+
+以下为历史 rc.3 验收记录，不代表当前源码仍支持 rc.3。
+
 日期：2026-10-27。环境：Windows、Node.js 24.18.0。
 
 本次使用独立克隆的官方 `dsh-v0.2.1-rc.3`，提交

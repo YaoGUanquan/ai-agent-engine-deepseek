@@ -6,6 +6,7 @@ import { stringify } from 'yaml'
 import { chromium, type Browser, type Page } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { symbols } from '@deepseek-ai/cordis'
+import { evaluatePluginCompatibility } from '@deepseek-ai/dsh-app-boot'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { SessionId, SessionLogOffset } from '@deepseek-ai/dsh-session'
 import { launchWebScaffold, type WebScaffold } from './scaffold.ts'
@@ -14,6 +15,24 @@ import { MockAdapter, textResponse } from '../../../packages/core/agent-loop/tes
 
 const pluginRoot = process.env.AE_PLUGIN_ROOT
 if (!pluginRoot) throw new Error('Run this integration through tools/harness-integration.mjs')
+
+describe('AI Agent Engine runtime compatibility', () => {
+  it('admits supported runtimes without exemptions, including the peer fallback', async () => {
+    const manifest = JSON.parse(await readFile(join(pluginRoot, 'package.json'), 'utf8'))
+    for (const runtime of ['0.2.1-rc.5']) {
+      expect(evaluatePluginCompatibility(manifest, {}, runtime)).toBeUndefined()
+      const { engines: _engines, ...peerManifest } = manifest
+      expect(evaluatePluginCompatibility(peerManifest, {}, runtime)).toBeUndefined()
+    }
+    for (const runtime of ['0.2.1-rc.2', '0.2.1-rc.3', '0.2.1-rc.4', '0.2.1-rc.6', '0.2.1', '0.2.2']) {
+      expect(evaluatePluginCompatibility(manifest, {}, runtime)).toMatchObject({
+        exempted: false,
+        requirements: { 'engines.dsh': manifest.engines.dsh },
+      })
+    }
+  })
+})
+
 let rpcSequence = 0
 type DeletionPreview = {
   sessionId: SessionId; sessionIds: SessionId[]; fingerprint: string; runningSessionIds: SessionId[]

@@ -25,10 +25,14 @@
 | 项目 | 当前支持范围 |
 | --- | --- |
 | 插件版本 | `0.2.3` |
-| DeepSeek Harness | `0.2.1-rc.3` |
+| DeepSeek Harness（当前源码） | `0.2.1-rc.5` |
 | Desktop 实机验证 | Windows 原版 Desktop |
 
 其他版本和平台尚未完成实机验证。
+
+源码中的未发布兼容修复面向 Harness `0.2.1-rc.5`，全部 DSH 依赖同步到该版本；不再声明支持 `rc.3`。
+已发布的 `v0.2.3` 标签及 Release 安装包仍只声明支持 `rc.3`；
+`rc.5` 需安装包含兼容修复的新构建包，不能靠重新安装原有固定标签获得修复。
 
 ### 在 Desktop 中安装
 
@@ -229,7 +233,7 @@ npm pack
 
 构建后可在 Desktop 插件管理器中安装生成的 `ai-agent-engine-deepseek-0.2.3.tgz`。提交源码变更时应同步构建产物 `lib/`，保证 Git 地址安装可直接使用。
 
-使用未修改的官方 Harness 源码运行集成验收：
+使用未修改的官方 Harness `dsh-v0.2.1-rc.5` 源码完成依赖安装和构建后运行集成验收；测试入口会拒绝版本不匹配的宿主：
 
 ```bash
 node tools/harness-integration.mjs "<official-harness-source-directory>"

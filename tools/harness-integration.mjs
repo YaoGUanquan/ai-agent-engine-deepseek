@@ -6,7 +6,12 @@ import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 
 const root = fileURLToPath(new URL('../', import.meta.url))
-const upstream = resolve(process.argv[2] ?? resolve(root, '.harness/stock'))
+const upstream = resolve(process.argv[2] ?? resolve(root, '.harness/rc5'))
+const supportedRuntime = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8')).engines.dsh
+const fixtureRuntime = JSON.parse(readFileSync(resolve(upstream, 'package.json'), 'utf8')).version
+if (fixtureRuntime !== supportedRuntime) {
+  throw new Error(`Harness fixture ${fixtureRuntime} does not match supported runtime ${supportedRuntime}`)
+}
 const integration = resolve(upstream, '.ae-integration')
 mkdirSync(integration, { recursive: true })
 const target = resolve(integration, 'ae-plugin.e2e.ts')

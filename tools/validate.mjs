@@ -12,7 +12,17 @@ assert.equal(pkg.version, lock.version)
 assert.equal(pkg.version, lock.packages[''].version)
 assert.ok(readFileSync('README.md', 'utf8').includes(`github:YaoGUanquan/ai-agent-engine-deepseek#v${pkg.version}`))
 assert.ok(readFileSync('CHANGELOG.md', 'utf8').includes(`## ${pkg.version} -`))
-assert.equal(pkg.engines.dsh, '0.2.1-rc.3')
+assert.equal(pkg.engines.dsh, '0.2.1-rc.5')
+assert.deepEqual(lock.packages[''].engines, pkg.engines)
+assert.deepEqual(lock.packages[''].peerDependencies, pkg.peerDependencies)
+for (const [name, range] of Object.entries(pkg.peerDependencies)) {
+  if (name.startsWith('@deepseek-ai/dsh-')) assert.equal(range, pkg.engines.dsh)
+}
+for (const [name, version] of Object.entries({ ...pkg.dependencies, ...pkg.devDependencies })) {
+  if (!name.startsWith('@deepseek-ai/dsh-')) continue
+  assert.equal(version, pkg.engines.dsh)
+  assert.equal(lock.packages[`node_modules/${name}`].version, version)
+}
 assert.ok(!pkg.files.some(path => path.startsWith('.harness')))
 const patch = parseDocument(readFileSync('cordis.patch.yml', 'utf8'), { uniqueKeys: true })
 assert.equal(patch.errors.length, 0)
