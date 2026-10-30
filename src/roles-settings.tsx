@@ -9,7 +9,7 @@ import {
   mergeRoleCatalog,
   type RoleDefinition,
 } from './role-catalog.ts'
-import type { RolesRemote } from './roles-contract.ts'
+import type { RolesCatalogView, RolesPutResult, RolesRemote, RolesRestoreResult } from './roles-contract.ts'
 
 type RolesSettingsProps = PropsRuntime<'settings.section'>
   & PropsLocale<'ai-agent-engine'>
@@ -40,13 +40,14 @@ function draftToDefinitions(draft: readonly DraftRole[]): RoleDefinition[] {
   }))
 }
 
-async function unwrap<T>(call: Promise<{ ok: true; value: T } | { ok: false; error: unknown }> | Promise<T>): Promise<T> {
-  const result = await call as T | { ok: true; value: T } | { ok: false; error: unknown }
+async function unwrap<T>(call: Promise<unknown>): Promise<T> {
+  const result = await call
   if (result && typeof result === 'object' && 'ok' in result) {
-    if (!result.ok) throw result.error
-    return result.value
+    const wrapped = result as { ok: boolean; value?: T; error?: unknown }
+    if (!wrapped.ok) throw wrapped.error
+    return wrapped.value as T
   }
-  return result
+  return result as T
 }
 
 /** Settings section for editing the shared roles.json overlay via aeRoles RPC. */
@@ -63,7 +64,7 @@ export function RolesSettingsPage({ roles, t }: RolesSettingsProps) {
     setStatus('loading')
     setMessage('')
     try {
-      const catalog = await unwrap(roles.getCatalog({}) as never)
+      const catalog = await unwrap<RolesCatalogView>(roles.getCatalog({}))
       setDraft(toDraft(catalog.roles))
       setPath(catalog.path)
       setSource(catalog.source)
@@ -105,7 +106,7 @@ export function RolesSettingsPage({ roles, t }: RolesSettingsProps) {
         if (!isValidRoleId(role.id)) throw new Error(t('roles.invalidId'))
       }
       const overlay = diffRolesAgainstBuiltin(definitions)
-      const result = await unwrap(roles.putOverlay({ version: 1, roles: overlay }) as never)
+      const result = await unwrap<RolesPutResult>(roles.putOverlay({ version: 1, roles: overlay }))
       setDraft(toDraft(result.roles))
       setPath(result.path)
       setSource(result.source)
@@ -121,7 +122,7 @@ export function RolesSettingsPage({ roles, t }: RolesSettingsProps) {
     setStatus('saving')
     setMessage('')
     try {
-      const result = await unwrap(roles.restoreDefaults({}) as never)
+      const result = await unwrap<RolesRestoreResult>(roles.restoreDefaults({}))
       setDraft(toDraft(result.roles.length ? result.roles : mergeRoleCatalog(BUILTIN_ROLES, [])))
       setPath(result.path)
       setSource('builtin')
