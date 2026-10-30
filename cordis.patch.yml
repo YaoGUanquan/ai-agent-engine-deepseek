@@ -7,3 +7,5 @@
         engineering: true
         conversationManagement: true
         maxMembers: 8
+        rolesEnabled: true
+        rolesPath: ''

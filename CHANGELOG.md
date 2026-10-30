@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.3 - 2026-10-30
+
+- 支持通过 `$DSH_HOME/ai-agent-engine/roles.json` 覆盖/追加工程队友角色（按 id 深合并；损坏或非法文件启动时回退内置角色，不拖垮插件）。
+- 新增配置项 `rolesEnabled`（volatile，默认 true）与可选 `rolesPath`；恢复默认即删除/清空 roles.json。
+- Lead 协作策略按合并后的角色表渲染；已创建队友不受影响，新 spawn 才读到合并结果。
+- 单测覆盖内置种子、覆盖、追加、禁用、损坏隔离，以及并行 resolve/多次内置角色策略构建的无串扰。
+
 ## 0.2.2 - 2026-10-28
 
 - 启动隔离：损坏的删除记录（`.ai-agent-engine/deletions/*.json`）改名隔离为 `*.json.corrupt` 并打日志，不再抛错拖垮整插件。

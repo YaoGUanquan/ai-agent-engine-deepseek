@@ -14,14 +14,17 @@ import { ConversationDeletion } from './conversation-deletion.ts'
 export const name = 'ai-agent-engine'
 export const inject = ['loader', 'agentPresets', 'agents', 'sessions', 'sessionPersistence', 'sessionProjections', 'subagents', 'skills']
 
-export interface Config extends Omit<PluginConfig, 'conversationManagement'> {
+export interface Config extends Omit<PluginConfig, 'conversationManagement' | 'rolesEnabled'> {
   conversationManagement: Volatile<boolean>
+  rolesEnabled: Volatile<boolean>
 }
 
 export const Config = z.object({
   engineering: z.boolean().default(true),
   conversationManagement: z.boolean().default(true).volatile(),
   maxMembers: z.natural().min(1).default(8),
+  rolesEnabled: z.boolean().default(true).volatile(),
+  rolesPath: z.string().default(''),
 })
 
 /** Install an optional native preset without changing the selected default. */
@@ -40,7 +43,11 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
   if (problem) throw new Error(`The Standard preset cannot be used as the engineering base: ${problem}`)
   const globalTeamTools = [...ctx.loader.entries()].some(entry =>
     entry.options.name === '@deepseek-ai/dsh-experimental-tool-agent-team' && !entry.disabled)
-  ctx.plugin(engineering, { teamTools: !globalTeamTools })
+  ctx.plugin(engineering, {
+    teamTools: !globalTeamTools,
+    rolesEnabled: () => config.rolesEnabled.get(),
+    rolesPath: config.rolesPath,
+  })
   ctx.plugin(AgentPreset, {
     id: 'ai-agent-engine',
     name: 'AI Agent Engine',
