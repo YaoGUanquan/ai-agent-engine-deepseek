@@ -1,4 +1,5 @@
 import type { Context } from '@deepseek-ai/cordis'
+import type {} from '@deepseek-ai/cordis-plugin-loader'
 import { useEffect, useRef } from 'react'
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
@@ -21,12 +22,14 @@ import { pluginRpc } from './rpc.ts'
 import { RolesSettingsPage } from './roles-settings.tsx'
 import type { RolesRemote } from './roles-contract.ts'
 import { attachRowContextMenu } from './row-context-menu.ts'
+import { initialModuleStatuses, mountModule } from './module-runtime.ts'
+import { CompatibilitySettingsPage } from './compatibility-settings.tsx'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap { 'ai-agent-engine': LocaleKey }
 }
 
-export const inject = ['slots', 'locale', 'remote', 'remote.session', 'configForms', 'sessions', 'uiWorkspace']
+export const inject = ['slots', 'locale', 'remote']
 
 type Controller = ReturnType<typeof createDeletionController>
 type ModuleProps = PropsHooks<{ settings: SettingsDescribeFace }>
@@ -88,17 +91,45 @@ export function DeletionDialog({ useDeletion, useSettings, confirm, close, reque
 
 /** Follow the shared Host settings mirror and register deletion controls. */
 export async function apply(ctx: Context): Promise<void> {
-  try { await mountClient(ctx) } catch (error) {
-    console.error('AI Agent Engine initialization failed:', error instanceof Error ? error.message : 'Unknown initialization error')
-    throw error
-  }
+  ctx.locale.register('ai-agent-engine', { en, zh })
+  const statuses = initialModuleStatuses()
+  await ctx.remote.$mount(pluginRpc)
+  const translate = ctx.locale.bind('ai-agent-engine')
+  ctx.slots.inject('settings.section', () => ctx.slots.register({
+    name: 'settings.section', id: 'ai-agent-engine-compatibility', order: 421,
+    label: translate('compatibility.section'), locale: 'ai-agent-engine',
+    inject: () => ({ remote: ctx.get('remote.aeCompatibility'), clientStatuses: statuses }),
+  }, CompatibilitySettingsPage))
+  mountModule(ctx, 'engineering', ['slots', 'locale', 'sessions', 'uiWorkspace', 'loader'], {
+    slots: ['inject', 'register', 'entries', 'subscribe'], locale: ['bind', 'getSnapshot'],
+    sessions: ['binding', 'retainInfo'], uiWorkspace: ['openSession'],
+    loader: ['entries'],
+  }, statuses, async scope => {
+    try {
+      const configured = [...scope.loader.entries()].some(entry =>
+        entry.options.name === '@deepseek-ai/dsh-experimental-client-ui-agent-team' && !entry.disabled)
+      const existing = scope.slots.entries('conversation.session.header.actions').some(entry => entry.options.id === 'agent-team')
+      if (!configured && !existing) {
+        const official = await import('@deepseek-ai/dsh-experimental-client-ui-agent-team/client')
+        await scope.plugin(official)
+      }
+      installTeamPresentation(scope)
+    } catch (error) {
+      console.warn('AI Agent Engine team interface unavailable:', error instanceof Error ? error.message : 'Unknown initialization error')
+      throw error
+    }
+  })
+  mountModule(ctx, 'deletion', ['slots', 'locale', 'remote', 'remote.session', 'configForms', 'sessions', 'uiWorkspace'], {
+    configForms: ['describe'], sessions: ['retainInfo'], uiWorkspace: ['startSession'],
+    remote: ['$on'], slots: ['inject', 'register'],
+  }, statuses, async scope => { mountDeletion(scope) })
+  mountModule(ctx, 'roles', ['slots', 'locale', 'remote'], {
+    slots: ['inject', 'register'], locale: ['bind', 'subscribe'],
+  }, statuses, async scope => { mountRoles(scope) })
 }
 
-async function mountClient(ctx: Context): Promise<void> {
-  ctx.locale.register('ai-agent-engine', { en, zh })
-  installTeamPresentation(ctx)
+function mountDeletion(ctx: Context): void {
   const settings = ctx.configForms.describe()
-  await ctx.remote.$mount(pluginRpc)
   const remote = ctx.get('remote.aeConversations')
   if (!remote) throw new Error('AI Agent Engine conversation API namespace was not mounted')
   const leaveDeleted = (ids: readonly SessionId[]) => {
@@ -127,7 +158,9 @@ async function mountClient(ctx: Context): Promise<void> {
       close: controller.close, requestDeletion,
     }),
   }, DeletionDialog))
+}
 
+function mountRoles(ctx: Context): void {
   const rolesRemote = ctx.get('remote.aeRoles') as RolesRemote | undefined
   if (!rolesRemote) throw new Error('AI Agent Engine roles API namespace was not mounted')
   const translate = ctx.locale.bind('ai-agent-engine')

@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { describe, expect, it } from 'vitest'
-import { clearDisabledSearchIndex } from '../src/disabled-search-index.ts'
+import { clearDisabledSearchIndex, validateSearchIndex } from '../src/disabled-search-index.ts'
 
 describe('disabled Harness search index cleanup', () => {
   it('deletes only the selected identities and retains unrelated documents', async () => {
@@ -36,6 +36,7 @@ describe('disabled Harness search index cleanup', () => {
     const db = new DatabaseSync(path)
     try {
       db.exec('CREATE TABLE preserved (id INTEGER); INSERT INTO preserved VALUES (1)')
+      await expect(validateSearchIndex(path)).rejects.toThrow('not a recognized')
       await expect(clearDisabledSearchIndex(path, ['deleted'])).rejects.toThrow('not a recognized')
       expect(db.prepare('SELECT id FROM preserved').all()).toEqual([{ id: 1 }])
     } finally {

@@ -1,7 +1,6 @@
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { readFile } from 'node:fs/promises'
-import * as teamTools from '@deepseek-ai/dsh-experimental-tool-agent-team'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-agent-preset-registry'
 import type {} from '@deepseek-ai/dsh-system-prompt'
@@ -50,7 +49,7 @@ export async function buildEngineeringPolicy(
 export async function apply(ctx: Context, config: EngineeringConfig): Promise<void> {
   const warn = (message: string, ...args: unknown[]) => { ctx.logger.warn(message, ...args) }
   let policy = await buildEngineeringPolicy(config, warn)
-  if (config.teamTools) ctx.plugin(teamTools)
+  if (config.teamTools) await ctx.plugin(await import('@deepseek-ai/dsh-experimental-tool-agent-team'))
   const installed = new Map<Agent, () => void>()
   const reconcile = (agent: Agent): void => {
     const preset = ctx.agentPresets.composedPreset(agent.ctx)

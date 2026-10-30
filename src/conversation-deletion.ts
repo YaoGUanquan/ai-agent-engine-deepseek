@@ -14,7 +14,8 @@ import type {} from '@deepseek-ai/dsh-api-session-controller'
 import { Remote, RemoteError, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
 import { wrapMethod } from './runtime-method.ts'
 import type { SessionDeletionPreview, SessionDeletionRequest } from './deletion-contract.ts'
-import { clearDisabledSearchIndex } from './disabled-search-index.ts'
+import { clearDisabledSearchIndex, validateSearchIndex } from './disabled-search-index.ts'
+import { requireMethods } from './module-runtime.ts'
 
 interface DeletionRecord {
   version: 1
@@ -125,7 +126,7 @@ export class ConversationDeletion extends TypertRemoteService {
   private closing = false
   private unsupported = false
 
-  constructor(ctx: Context, private readonly config: { enabled: () => boolean }) {
+  constructor(ctx: Context, private readonly config: { enabled: () => boolean; onUnsupported?: () => void }) {
     super(ctx, 'aeConversations')
     this.ready = this.initialize()
   }
@@ -137,9 +138,25 @@ export class ConversationDeletion extends TypertRemoteService {
     const persistence = ctx.sessionPersistence as SessionPersistence & { name: string; config?: { root?: string } }
     if (!supportsConversationDeletionPersistence(persistence)) {
       this.unsupported = true
+      this.config.onUnsupported?.()
       ctx.logger.warn('Conversation deletion disabled: storage backend is not session-persistence-jsonl with a configured root')
       return
     }
+    requireMethods(ctx, {
+      agents: ['create', 'resume', 'get'],
+      sessions: ['list', 'get'],
+      sessionPersistence: ['create', 'open', 'stat', 'list'],
+      sessionQuery: ['searchSessions'],
+      storageDomain: ['get'],
+      workspaceRegistry: ['list', 'unarchiveSession', 'unpinSession'],
+      remoteAccess: ['allows'],
+    })
+    const { SESSION_FORMAT_VERSION } = await import('@deepseek-ai/dsh-session')
+    if (SESSION_FORMAT_VERSION !== 4) {
+      this.config.onUnsupported?.()
+      throw new Error('Unsupported session storage format')
+    }
+    await this.validateStorage()
     this.root = resolve(persistence.config!.root!)
     this.directory = join(this.root, '.ai-agent-engine', 'deletions')
     await mkdir(this.directory, { recursive: true, mode: 0o700 })
@@ -281,6 +298,7 @@ export class ConversationDeletion extends TypertRemoteService {
     if (!request || request.stopRunning !== true || !Array.isArray(request.sessionIds)
       || request.sessionIds.some(id => typeof id !== 'string')) reject('Invalid deletion confirmation')
     this.authorize(request.sessionIds)
+    await this.validateStorage()
     const record = this.previews.get(request.fingerprint)
     if (!record || record.rootId !== request.sessionId
       || JSON.stringify(record.headers.map(header => header.id)) !== JSON.stringify(request.sessionIds)) {
@@ -340,6 +358,7 @@ export class ConversationDeletion extends TypertRemoteService {
   }
 
   private async cleanup(record: DeletionRecord): Promise<void> {
+    await this.validateStorage()
     const root = await realpath(this.root)
     for (const header of record.headers) {
       const directory = sessionDirectory(this.root, header)
@@ -373,5 +392,20 @@ export class ConversationDeletion extends TypertRemoteService {
     record.complete = true
     await this.save(record)
     for (const id of ids) ctx.emit('api-session/removed', id)
+  }
+
+  private async validateStorage(): Promise<void> {
+    const query = this.ctx.sessionQuery as typeof this.ctx.sessionQuery & { config?: { path?: string } }
+    try { await validateSearchIndex(query.config?.path) } catch (error) {
+      this.config.onUnsupported?.()
+      throw error
+    }
+    const cache = this.ctx.storageDomain.get('session_projcache')?.table('sessions')
+    if (cache && (typeof cache.put !== 'function' || typeof cache.delete !== 'function')) {
+      throw new Error('Unsupported session projection cache')
+    }
+    for (const workspace of this.ctx.workspaceRegistry.list()) {
+      if (typeof workspace.detachSession !== 'function') throw new Error('Unsupported workspace session interface')
+    }
   }
 }

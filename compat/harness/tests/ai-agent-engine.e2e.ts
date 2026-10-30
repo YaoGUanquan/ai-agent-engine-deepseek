@@ -19,12 +19,12 @@ if (!pluginRoot) throw new Error('Run this integration through tools/harness-int
 describe('AI Agent Engine runtime compatibility', () => {
   it('admits supported runtimes without exemptions, including the peer fallback', async () => {
     const manifest = JSON.parse(await readFile(join(pluginRoot, 'package.json'), 'utf8'))
-    for (const runtime of ['0.2.1-rc.5']) {
+    for (const runtime of ['0.2.1-rc.5', '0.2.1-rc.6', '0.2.1-rc.7', '0.2.1']) {
       expect(evaluatePluginCompatibility(manifest, {}, runtime)).toBeUndefined()
       const { engines: _engines, ...peerManifest } = manifest
       expect(evaluatePluginCompatibility(peerManifest, {}, runtime)).toBeUndefined()
     }
-    for (const runtime of ['0.2.1-rc.2', '0.2.1-rc.3', '0.2.1-rc.4', '0.2.1-rc.6', '0.2.1', '0.2.2']) {
+    for (const runtime of ['0.2.1-rc.2', '0.2.1-rc.3', '0.2.1-rc.4', '0.2.2-rc.1', '0.2.2']) {
       expect(evaluatePluginCompatibility(manifest, {}, runtime)).toMatchObject({
         exempted: false,
         requirements: { 'engines.dsh': manifest.engines.dsh },
@@ -67,6 +67,7 @@ describe('AI Agent Engine real profile and browser', () => {
     page.on('pageerror', error => { console.error(`Fixture browser error: ${error.message}`) })
     page.on('console', message => {
       if (message.type() === 'error') console.error(`Fixture browser console: ${message.text()}`)
+      if (message.type() !== 'error' && message.text().includes('AI Agent Engine')) console.warn(message.text())
     })
     await page.goto(scaffold.authenticatedUrl)
     try {
@@ -96,6 +97,18 @@ describe('AI Agent Engine real profile and browser', () => {
     await settings.locator('[data-ae-role-row="frontend"]').waitFor()
     await settings.locator('[data-ae-role-row="backend"]').waitFor()
     expect(await settings.locator('[data-ae-roles-settings] [role="alert"]').count()).toBe(0)
+    await settings.getByRole('button', { name: 'Close', exact: true }).click()
+    await settings.waitFor({ state: 'detached' })
+  })
+
+  it('reports all host and browser modules ready through the owner-only status interface', async () => {
+    await page.getByRole('button', { name: 'Account menu', exact: true }).click()
+    await page.getByRole('menuitem', { name: 'Settings', exact: true }).click()
+    const settings = page.getByRole('dialog', { name: 'Settings', exact: true })
+    await settings.getByText('Plugin status', { exact: true }).click()
+    const status = settings.locator('[data-ae-compatibility]')
+    await expect.poll(() => status.innerText(), { timeout: 5000 }).not.toMatch(/Unavailable|waiting|unavailable/)
+    expect((await status.innerText()).match(/\bAvailable\b/g)).toHaveLength(6)
     await settings.getByRole('button', { name: 'Close', exact: true }).click()
     await settings.waitFor({ state: 'detached' })
   })
@@ -419,6 +432,18 @@ describe('AI Agent Engine independent module composition', () => {
       expect(fixture.ctx.get('agentTeams')).toBeDefined()
       expect(fixture.ctx.settings.describe().find(row => row.ns === 'ai-agent-engine')?.value)
         .toEqual({ conversationManagement: true, rolesEnabled: true })
+      const coexistBrowser = await chromium.launch()
+      try {
+        const coexistPage = await newEnglishPage(coexistBrowser)
+        await coexistPage.goto(fixture.authenticatedUrl)
+        await coexistPage.waitForSelector('[class*="frame"]')
+        await coexistPage.getByRole('button', { name: 'Account menu', exact: true }).click()
+        await coexistPage.getByRole('menuitem', { name: 'Settings', exact: true }).click()
+        const settings = coexistPage.getByRole('dialog', { name: 'Settings', exact: true })
+        await settings.getByText('Plugin status', { exact: true }).click()
+        await expect.poll(() => settings.locator('[data-ae-compatibility] tbody td:last-child').allTextContents())
+          .toEqual(['Available', 'Available', 'Available'])
+      } finally { await coexistBrowser.close() }
       if (engineering) {
         const adapter = new MockAdapter(['hang'])
         fixture.ctx.llm.registerAdapter(['ae-coexist'], adapter)

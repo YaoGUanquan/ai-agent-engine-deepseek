@@ -54,6 +54,7 @@ export declare class ConversationDeletion extends TypertRemoteService {
     private unsupported;
     constructor(ctx: Context, config: {
         enabled: () => boolean;
+        onUnsupported?: () => void;
     });
     protected [Service.init](): Promise<void>;
     private initialize;
@@ -68,5 +69,6 @@ export declare class ConversationDeletion extends TypertRemoteService {
     private performDeletion;
     private save;
     private cleanup;
+    private validateStorage;
 }
 export {};

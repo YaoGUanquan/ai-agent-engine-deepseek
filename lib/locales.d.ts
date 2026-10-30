@@ -1,4 +1,18 @@
 export declare const en: {
+    readonly 'compatibility.section': "Plugin status";
+    readonly 'compatibility.module': "Module";
+    readonly 'compatibility.host': "Host";
+    readonly 'compatibility.client': "Interface";
+    readonly 'compatibility.engineering': "Engineering collaboration";
+    readonly 'compatibility.roles': "Engineering roles";
+    readonly 'compatibility.deletion': "Permanent deletion";
+    readonly 'compatibility.ready': "Available";
+    readonly 'compatibility.services': "Unavailable: waiting for Host services";
+    readonly 'compatibility.interface': "Unavailable: incompatible Host interface";
+    readonly 'compatibility.initialization': "Unavailable: initialization failed";
+    readonly 'compatibility.storage': "Unavailable: unsupported storage or search index";
+    readonly 'compatibility.unavailable': "Disabled";
+    readonly 'compatibility.unreachable': "Host status unavailable";
     readonly 'role.lead': "Engineering lead";
     readonly 'role.requirements': "Requirements analyst";
     readonly 'role.frontend': "Frontend engineer";

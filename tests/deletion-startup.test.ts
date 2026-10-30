@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto'
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
+import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
@@ -18,6 +19,62 @@ function fingerprint(headers: readonly { id: string; createdAt: number; cwd?: st
 }
 
 describe('conversation deletion startup isolation', () => {
+  it('refuses an unknown index before journal recovery, wrappers, or session writes', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'ae-deletion-index-'))
+    const path = join(root, 'foreign.sqlite')
+    const db = new DatabaseSync(path)
+    db.exec('CREATE TABLE preserved (id INTEGER); INSERT INTO preserved VALUES (1)')
+    const ctx = new Context()
+    const create = vi.fn()
+    const onUnsupported = vi.fn()
+    Object.assign(ctx, {
+      typert: { register: vi.fn() },
+      sessionPersistence: {
+        name: 'session-persistence-jsonl', config: { root },
+        create: vi.fn(), open: vi.fn(), stat: vi.fn(), list: vi.fn(),
+      },
+      agents: { create, resume: vi.fn(), get: vi.fn() },
+      sessions: { list: vi.fn(), get: vi.fn() },
+      sessionQuery: { searchSessions: vi.fn(), config: { path } },
+      storageDomain: { get: vi.fn() },
+      workspaceRegistry: { list: vi.fn(() => []), unarchiveSession: vi.fn(), unpinSession: vi.fn() },
+      remoteAccess: { allows: vi.fn() },
+    })
+    try {
+      const service = new ConversationDeletion(ctx, { enabled: () => true, onUnsupported })
+      await expect((service as unknown as { ready: Promise<void> }).ready).rejects.toThrow('not a recognized')
+      expect(ctx.agents.create).toBe(create)
+      expect(ctx.sessionPersistence.create).not.toHaveBeenCalled()
+      expect(ctx.sessionPersistence.open).not.toHaveBeenCalled()
+      expect(onUnsupported).toHaveBeenCalledOnce()
+      expect(await readdir(root)).toEqual(['foreign.sqlite'])
+      expect(db.prepare('SELECT id FROM preserved').all()).toEqual([{ id: 1 }])
+    } finally {
+      db.close()
+      await ctx.fiber.dispose()
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+  it('rejects missing methods before creating journals or wrapping agents', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'ae-deletion-preflight-'))
+    const ctx = new Context()
+    const create = vi.fn()
+    Object.assign(ctx, {
+      typert: { register: vi.fn() },
+      sessionPersistence: { name: 'session-persistence-jsonl', config: { root } },
+      agents: { create, resume: vi.fn(), get: vi.fn() },
+      sessions: { list: vi.fn(), get: vi.fn() },
+    })
+    try {
+      const service = new ConversationDeletion(ctx as never, { enabled: () => true })
+      await expect((service as unknown as { ready: Promise<void> }).ready).rejects.toThrow('sessionPersistence.create')
+      expect(ctx.agents.create).toBe(create)
+      expect(await readdir(root)).toEqual([])
+    } finally {
+      await ctx.fiber.dispose()
+      await rm(root, { recursive: true, force: true })
+    }
+  })
   it('recognizes only jsonl persistence with a configured root', () => {
     expect(supportsConversationDeletionPersistence({
       name: 'session-persistence-jsonl', config: { root: '/tmp/sessions' },
@@ -105,8 +162,11 @@ describe('conversation deletion startup isolation', () => {
         stat: vi.fn(),
         list: vi.fn(async () => []),
       },
-      agents: { create: vi.fn(), resume: vi.fn() },
-      sessions: { list: vi.fn(() => []) },
+      agents: { create: vi.fn(), resume: vi.fn(), get: vi.fn() },
+      sessions: { list: vi.fn(() => []), get: vi.fn() },
+      sessionQuery: { searchSessions: vi.fn() },
+      workspaceRegistry: { list: vi.fn(() => []), unarchiveSession: vi.fn(), unpinSession: vi.fn() },
+      remoteAccess: { allows: vi.fn() },
       storageDomain: { get: vi.fn(() => undefined) },
       logger: Object.assign(vi.fn(), { warn, info: vi.fn(), error: vi.fn(), debug: vi.fn() }),
       effect: vi.fn(() => () => {}),

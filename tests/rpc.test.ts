@@ -14,6 +14,7 @@ describe('plugin RPC registration', () => {
       'aeRoles/getOverlay',
       'aeRoles/putOverlay',
       'aeRoles/restoreDefaults',
+      'aeCompatibility/getStatus',
     ]
     try {
       for (let attempt = 0; attempt < 2; attempt++) {

@@ -2,6 +2,7 @@ import { readFileSync, readdirSync, existsSync, realpathSync, statSync } from 'n
 import { resolve, dirname, relative, isAbsolute } from 'node:path'
 import assert from 'node:assert/strict'
 import { parseDocument } from 'yaml'
+import semver from 'semver'
 
 const expected = ['ae-grill', 'ae-frontend', 'ae-backend', 'ae-unit-test', 'ae-integration-test', 'ae-e2e-test', 'ae-e2e-suite'].sort()
 assert.deepEqual(readdirSync('skills').sort(), expected)
@@ -12,15 +13,22 @@ assert.equal(pkg.version, lock.version)
 assert.equal(pkg.version, lock.packages[''].version)
 assert.ok(readFileSync('README.md', 'utf8').includes(`github:YaoGUanquan/ai-agent-engine-deepseek#v${pkg.version}`))
 assert.ok(readFileSync('CHANGELOG.md', 'utf8').includes(`## ${pkg.version} -`))
-assert.equal(pkg.engines.dsh, '0.2.1-rc.5')
+assert.equal(pkg.engines.dsh, '>=0.2.1-rc.5 <0.2.2-0')
 assert.deepEqual(lock.packages[''].engines, pkg.engines)
 assert.deepEqual(lock.packages[''].peerDependencies, pkg.peerDependencies)
 for (const [name, range] of Object.entries(pkg.peerDependencies)) {
   if (name.startsWith('@deepseek-ai/dsh-')) assert.equal(range, pkg.engines.dsh)
 }
-for (const [name, version] of Object.entries({ ...pkg.dependencies, ...pkg.devDependencies })) {
+assert.deepEqual(lock.packages[''].dependencies, pkg.dependencies)
+for (const [name, range] of Object.entries(pkg.dependencies)) {
+  if (name.startsWith('@deepseek-ai/dsh-')) {
+    assert.equal(range, pkg.engines.dsh)
+    assert.ok(semver.satisfies(lock.packages[`node_modules/${name}`].version, range))
+  }
+}
+for (const [name, version] of Object.entries(pkg.devDependencies)) {
   if (!name.startsWith('@deepseek-ai/dsh-')) continue
-  assert.equal(version, pkg.engines.dsh)
+  assert.equal(version, '0.2.1-rc.5')
   assert.equal(lock.packages[`node_modules/${name}`].version, version)
 }
 assert.ok(!pkg.files.some(path => path.startsWith('.harness')))

@@ -2,6 +2,8 @@ import { build } from 'esbuild'
 import { mkdir } from 'node:fs/promises'
 import { spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
+import { runInNewContext } from 'node:vm'
+import { fileURLToPath } from 'node:url'
 
 await mkdir('lib', { recursive: true })
 await build({
@@ -16,6 +18,28 @@ await build({
   // Preserve bundled string values without multiline trailing whitespace.
   supported: { 'template-literal': false },
   external: [...baseline, ...pkg.dsh.client.external],
+  plugins: [{
+    name: 'harness-team-client',
+    setup(builder) {
+      builder.onResolve({ filter: /^@deepseek-ai\/dsh-experimental-client-ui-agent-team\/client$/ }, () => ({
+        path: 'agent-team-client',
+        namespace: 'harness-client',
+      }))
+      builder.onLoad({ filter: /.*/, namespace: 'harness-client' }, () => {
+        // Official bundles register a lazy CJS factory, rather than exporting ESM.
+        // Capture only the registration at build time; execute its body inside our feature scope.
+        const registrations = []
+        const path = fileURLToPath(import.meta.resolve('@deepseek-ai/dsh-experimental-client-ui-agent-team/client'))
+        runInNewContext(readFileSync(path, 'utf8'), {
+          window: { __ModuleLoader__: { load: registration => registrations.push(registration) } },
+        }, { timeout: 1000 })
+        const [registration] = registrations
+        if (registrations.length !== 1 || registration?.id !== '@deepseek-ai/dsh-experimental-client-ui-agent-team'
+          || typeof registration.factory !== 'function') throw new Error('Unsupported Harness Team client bundle')
+        return { contents: `module.exports = (${registration.factory.toString()})(require);`, loader: 'js' }
+      })
+    },
+  }],
   banner: { js: 'window.__ModuleLoader__.load({id:"ai-agent-engine-deepseek",factory:(require)=>{var module={exports:{}};var exports=module.exports;' },
   footer: { js: 'return module.exports;}});' },
 })
