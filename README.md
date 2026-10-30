@@ -199,7 +199,7 @@ github:YaoGUanquan/ai-agent-engine-deepseek#v0.2.1
 
 ### 多个对话一起用前端/后端队友会不会串角色？
 
-无 overlay（或未启用合并）时，多对话并行或交替调用内置角色应保持默认种子行为、彼此不串。有异常视为回归缺陷。测侧正在做多对话回归；本说明不宣称该项已冒烟通过。已创建队友不会因为你改 `roles.json` 而自动换提示词。
+无 overlay（或未启用合并）时，多对话并行或交替调用内置角色应保持默认种子行为、彼此不串。测侧已对 main tip `85600bac`（#5 / 0.2.3）验收通过：`check:all` 33/33、六条契约全过，以及多对话并发/交替冒烟（20+10）无串台。已创建队友不会因为你改 `roles.json` 而自动换提示词。
 
 ### 会改变默认模式或数据目录吗？
 
@@ -207,9 +207,9 @@ github:YaoGUanquan/ai-agent-engine-deepseek#v0.2.1
 
 ### 当前版本验证过哪些功能？
 
-`0.2.3` 增加可配置工程角色覆盖（`$DSH_HOME/ai-agent-engine/roles.json`）与相关单测（含 role-catalog）；本机 `check:all` 绿。完整 Desktop 实机双队友与永久删除证据仍沿用 `0.2.0`/`0.2.1` 验收记录，详见 [VALIDATION](compat/harness/VALIDATION.md)。
+`0.2.3` 增加可配置工程角色覆盖（`$DSH_HOME/ai-agent-engine/roles.json`）与相关单测（含 role-catalog）。测侧已对 main tip `85600bac`（#5）验收通过：`check:all` 33/33、六条契约全过、多对话并发/交替冒烟（20+10）无串台。完整 Desktop 实机双队友与永久删除的历史证据仍沿用 `0.2.0`/`0.2.1` 验收记录，详见 [VALIDATION](compat/harness/VALIDATION.md)。
 
-真实模型创建前后端队友、角色显示和永久删除功能的完整实机验收，仍来自 `0.2.0`/`0.2.1` 记录；本版本未重新删除用户既有对话做实机验收。请用**多个对话**回归内置角色（如 frontend/backend）的 spawn 与展示，确认无覆盖文件时行为与 `0.2.2` / tip `6b638b7` 口径一致（测侧进行中，勿将「应保持」理解为「已验收通过」）。
+真实模型创建前后端队友、角色显示和永久删除功能的完整实机验收，仍来自 `0.2.0`/`0.2.1` 记录；本版本未重新删除用户既有对话做实机验收。无覆盖文件时，内置角色行为与 `0.2.2` / tip `6b638b7` 口径一致（已由上述测侧结果覆盖）。
 
 详细环境、检查结果和未验证范围见[验收记录](compat/harness/VALIDATION.md)。
 
@@ -259,7 +259,7 @@ node tools/harness-integration.mjs "<official-harness-source-directory>"
 - **可覆盖字段**：仅 `skill`、`responsibility`（按角色 `id`）。团队面板上的中文职称（如「前端工程师」）仍由插件 locales 决定，一期 overlay **不**改 UI 展示名
 - **合并**：按 `id` 深合并到包内 builtin 种子；只覆盖文件中出现的字段；未知 `id` 追加。插件升级后，内置文案随包刷新，未在 overlay 中出现的字段跟随新种子
 - **新 spawn** 才读合并结果；**已创建 / 冷恢复的队友不重绑**提示词与路由名
-- **多对话**：无 overlay（或 `rolesEnabled=false`）时，多个对话并行或交替调用内置 frontend/backend 等角色，应保持默认种子行为、彼此不串角色（测侧正在回归；此处不宣称已冒烟通过）
+- **多对话**：无 overlay（或 `rolesEnabled=false`）时，多个对话并行或交替调用内置 frontend/backend 等角色，保持默认种子行为、彼此不串角色（测侧已对 tip `85600bac` 冒烟通过：并发/交替 20+10 无串台）
 
 示例：
 

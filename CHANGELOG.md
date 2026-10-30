@@ -6,7 +6,7 @@
 - 新增配置项 `rolesEnabled`（volatile，默认 true）与可选 `rolesPath`；恢复默认即删除/清空 roles.json。
 - Lead 协作策略按合并后的角色表渲染；已创建队友不受影响，新 spawn 才读到合并结果。
 - 单测覆盖内置种子、覆盖、追加、禁用、损坏隔离，以及并行 resolve/多次内置角色策略构建的无串扰。
-- 文档：README 补充一期角色覆盖的设置说明、FAQ（旧队友不重绑、恢复默认、坏文件隔离、无自定义设置页、多对话不串角色口径）；明确 overlay 字段为 `skill`/`responsibility`。
+- 文档：README 补充一期角色覆盖的设置说明、FAQ（旧队友不重绑、恢复默认、坏文件隔离、无自定义设置页、多对话不串角色）；明确 overlay 字段为 `skill`/`responsibility`；记载测侧对 tip `85600bac` 的契约与多对话冒烟通过（文档 PR 本身仍待合）。
 
 ## 0.2.2 - 2026-10-28
 
