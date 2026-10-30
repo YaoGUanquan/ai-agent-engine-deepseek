@@ -85,7 +85,7 @@ export async function apply(ctx: Context, config: EngineeringConfig): Promise<vo
     installed.get(agent)?.()
     installed.delete(agent)
   })
-  ctx.on('loader/volatile-update', () => {
+  const refreshPolicy = (): void => {
     void (async () => {
       try {
         policy = await buildEngineeringPolicy(config, warn)
@@ -94,7 +94,9 @@ export async function apply(ctx: Context, config: EngineeringConfig): Promise<vo
         warn('Failed to refresh engineering role policy: %s', error instanceof Error ? error.message : error)
       }
     })()
-  })
+  }
+  ctx.on('loader/volatile-update', refreshPolicy)
+  ctx.on('ai-agent-engine/roles-updated', refreshPolicy)
   ctx.effect(() => () => {
     for (const dispose of installed.values()) dispose()
     installed.clear()

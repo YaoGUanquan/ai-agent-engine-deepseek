@@ -1,7 +1,7 @@
 /** Builtin engineering roles and user overlay merge for Lead policy. */
 
-import { readFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises'
+import { dirname, join } from 'node:path'
 
 /** One spawnable engineering role consumed by Lead policy text. */
 export interface RoleDefinition {
@@ -217,4 +217,134 @@ export function renderLeadPolicy(template: string, roles: readonly RoleDefinitio
   return template
     .replaceAll('{{ROLE_IDS}}', formatRoleIds(roles))
     .replaceAll('{{ROLE_TABLE}}', formatRoleTable(roles))
+}
+
+
+export class RoleOverlayValidationError extends Error {
+  readonly code = 'ae-roles/invalid-overlay' as const
+  constructor(message: string) {
+    super(message)
+    this.name = 'RoleOverlayValidationError'
+  }
+}
+
+/** Read raw overlay document without merging; missing file returns undefined. */
+export async function readOverlayDocument(
+  path: string,
+  warn: (message: string, ...args: unknown[]) => void = () => undefined,
+): Promise<RolesFile | undefined> {
+  let text: string
+  try {
+    text = await readFile(path, 'utf8')
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code
+    if (code === 'ENOENT') return undefined
+    warn('Failed to read role overlay at %s (%s)', path, code ?? 'error')
+    return undefined
+  }
+  const roles = parseRolesFile(text, warn)
+  if (!roles) return undefined
+  return { version: 1, roles }
+}
+
+/**
+ * Validate a candidate overlay document.
+ * Fail-closed: any illegal row or structure throws RoleOverlayValidationError.
+ */
+export function validateRolesFile(raw: unknown): RolesFile {
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
+    throw new RoleOverlayValidationError('Role overlay root must be an object')
+  }
+  const document = raw as Record<string, unknown>
+  if (document.version !== 1) {
+    throw new RoleOverlayValidationError(`Role overlay version is unsupported (${String(document.version)})`)
+  }
+  if (!Array.isArray(document.roles)) {
+    throw new RoleOverlayValidationError('Role overlay roles must be an array')
+  }
+  const roles: RoleOverlayEntry[] = []
+  const seen = new Set<string>()
+  const problems: string[] = []
+  for (const [index, row] of document.roles.entries()) {
+    const warnings: string[] = []
+    const entry = normalizeOverlayEntry(row, message => { warnings.push(message) })
+    if (!entry) {
+      problems.push(`roles[${index}]: ${warnings[0] ?? 'invalid entry'}`)
+      continue
+    }
+    if (seen.has(entry.id)) {
+      problems.push(`roles[${index}]: duplicate id ${entry.id}`)
+      continue
+    }
+    seen.add(entry.id)
+    roles.push(entry)
+  }
+  if (problems.length > 0) {
+    throw new RoleOverlayValidationError(`Role overlay rejected: ${problems.join('; ')}`)
+  }
+  return { version: 1, roles }
+}
+
+/** Persist overlay atomically (temp + rename). Validates before any write. */
+export async function writeRolesFile(path: string, raw: unknown): Promise<RolesFile> {
+  const document = validateRolesFile(raw)
+  const directory = dirname(path)
+  await mkdir(directory, { recursive: true, mode: 0o700 })
+  const temporary = `${path}.${process.pid}.${Date.now()}.tmp`
+  const payload = `${JSON.stringify({ version: 1, roles: document.roles }, null, 2)}\n`
+  try {
+    await writeFile(temporary, payload, { mode: 0o600, flag: 'wx' })
+    await rename(temporary, path)
+  } catch (error) {
+    try { await unlink(temporary) } catch { /* ignore cleanup */ }
+    throw error
+  }
+  return document
+}
+
+/** Delete overlay file. Missing file is success (restore defaults). */
+export async function deleteRolesFile(path: string): Promise<void> {
+  try {
+    await unlink(path)
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code
+    if (code === 'ENOENT') return
+    throw error
+  }
+}
+
+/**
+ * Build a true overlay from an edited merged catalog: only dirty fields and
+ * custom ids are recorded so package upgrades still refresh unoverridden fields.
+ */
+export function diffRolesAgainstBuiltin(
+  edited: readonly RoleDefinition[],
+  builtin: readonly RoleDefinition[] = BUILTIN_ROLES,
+): RoleOverlayEntry[] {
+  const builtinById = new Map(builtin.map(role => [role.id, role]))
+  const overlay: RoleOverlayEntry[] = []
+  for (const role of edited) {
+    if (!isValidRoleId(role.id)) continue
+    const base = builtinById.get(role.id)
+    if (!base) {
+      overlay.push({
+        id: role.id,
+        skill: role.skill,
+        responsibility: role.responsibility ?? '',
+      })
+      continue
+    }
+    const entry: RoleOverlayEntry = { id: role.id }
+    let dirty = false
+    if (role.skill !== undefined && role.skill !== base.skill) {
+      Object.assign(entry, { skill: role.skill })
+      dirty = true
+    }
+    if (role.responsibility !== undefined && role.responsibility !== base.responsibility) {
+      Object.assign(entry, { responsibility: role.responsibility })
+      dirty = true
+    }
+    if (dirty) overlay.push(entry)
+  }
+  return overlay
 }

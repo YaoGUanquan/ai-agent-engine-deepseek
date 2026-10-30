@@ -8,6 +8,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { SettingsDescribeFace } from '@deepseek-ai/dsh-client-ui-settings/client'
+import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { PropsHooks, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { Button, IconTrashOutlineRegular, MenuItemButton, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {} from './deletion-contract.ts'
@@ -17,6 +18,9 @@ import { conversationManagementEnabled } from './module-config.ts'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { installTeamPresentation } from './team-presentation.tsx'
 import { deletionRpc } from './deletion-rpc.ts'
+import { rolesRpc } from './roles-rpc.ts'
+import { RolesSettingsPage } from './roles-settings.tsx'
+import type { RolesRemote } from './roles-contract.ts'
 import { attachRowContextMenu } from './row-context-menu.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
@@ -96,6 +100,7 @@ async function mountClient(ctx: Context): Promise<void> {
   installTeamPresentation(ctx)
   const settings = ctx.configForms.describe()
   await ctx.remote.$mount(deletionRpc)
+  await ctx.remote.$mount(rolesRpc)
   const remote = ctx.get('remote.aeConversations')
   if (!remote) throw new Error('AI Agent Engine conversation API namespace was not mounted')
   const leaveDeleted = (ids: readonly SessionId[]) => {
@@ -124,4 +129,26 @@ async function mountClient(ctx: Context): Promise<void> {
       close: controller.close, requestDeletion,
     }),
   }, DeletionDialog))
+
+  const rolesRemote = ctx.get('remote.aeRoles') as RolesRemote | undefined
+  if (!rolesRemote) throw new Error('AI Agent Engine roles API namespace was not mounted')
+  const translate = ctx.locale.bind('ai-agent-engine')
+  const registerRolesSection = () => ctx.slots.register({
+    name: 'settings.section',
+    id: 'ai-agent-engine-roles',
+    order: 420,
+    label: translate('roles.section'),
+    locale: 'ai-agent-engine',
+    inject: () => ({ roles: rolesRemote }),
+  }, RolesSettingsPage)
+  ctx.slots.inject('settings.section', () => {
+    let dispose = registerRolesSection()
+    const refresh = () => {
+      dispose()
+      dispose = registerRolesSection()
+    }
+    // Locale changes update dictionary; re-register so the nav label refreshes.
+    const unsubscribe = ctx.locale.subscribe(refresh)
+    return () => { unsubscribe(); dispose() }
+  })
 }

@@ -10,9 +10,10 @@ import type { Config as PluginConfig } from './types.ts'
 import { installSkills } from './skills.ts'
 import * as engineering from './engineering.ts'
 import { ConversationDeletion } from './conversation-deletion.ts'
+import { RoleCatalogService } from './roles-service.ts'
 
 export const name = 'ai-agent-engine'
-export const inject = ['loader', 'agentPresets', 'agents', 'sessions', 'sessionPersistence', 'sessionProjections', 'subagents', 'skills']
+export const inject = ['loader', 'agentPresets', 'agents', 'sessions', 'sessionPersistence', 'sessionProjections', 'subagents', 'skills', 'typert']
 
 export interface Config extends Omit<PluginConfig, 'conversationManagement' | 'rolesEnabled'> {
   conversationManagement: Volatile<boolean>
@@ -30,6 +31,10 @@ export const Config = z.object({
 /** Install an optional native preset without changing the selected default. */
 export async function apply(ctx: Context, config: Config): Promise<void> {
   ctx.plugin(ConversationDeletion, { enabled: () => config.conversationManagement.get() })
+  ctx.plugin(RoleCatalogService, {
+    enabled: () => config.rolesEnabled.get(),
+    rolesPath: config.rolesPath,
+  })
   if (!config.engineering) return
   installSkills(ctx)
   // A configured official service may still be starting. Its separately
