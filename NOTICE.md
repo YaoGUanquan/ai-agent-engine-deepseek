@@ -20,6 +20,11 @@ Codex 版项目将 [jiangqiang1996/ai-agent-engine](https://gitee.com/jiangqiang
 `1f81c047fc48fa190a683e469daa699857e9afe8`，上游版权归 DeepSeek，
 许可证为 MIT，全文见 [上游许可证](compat/harness/LICENSE.upstream)。
 
+从 `0.2.4` 起，浏览器产物还包含官方
+`@deepseek-ai/dsh-experimental-client-ui-agent-team` 的 MIT 许可团队界面工厂，
+构建基线为 `dsh-v0.2.1-rc.5`；在插件自己的可释放模块范围内延迟挂载，
+以隔离初始化失败。上游版权和许可同上。
+
 `compat/harness` 保留了 `0.1.x` 使用的历史兼容补丁，其中包含 MIT
 许可的上游代码上下文。当前插件安装包不包含该补丁，
 无需修改用户的 Desktop。
