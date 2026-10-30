@@ -13,7 +13,6 @@ import {
   resolveRolesFilePath,
   writeRolesFile,
 } from './role-catalog-io.ts'
-import { rolesRpc } from './roles-rpc.ts'
 import type {
   RolesCatalogView,
   RolesOverlayView,
@@ -56,10 +55,6 @@ export class RoleCatalogService extends TypertRemoteService {
     },
   ) {
     super(ctx, 'aeRoles')
-    ctx.typert.register({
-      package: rolesRpc.package, face: 'host', schemas: [],
-      model: { services: [], events: [], objects: [] }, invocations: rolesRpc.descriptors,
-    })
   }
 
   private authorize(): void {

@@ -12,7 +12,6 @@ import type {} from '@deepseek-ai/dsh-session-query'
 import type {} from '@deepseek-ai/dsh-typert-registry'
 import type {} from '@deepseek-ai/dsh-api-session-controller'
 import { Remote, RemoteError, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
-import { deletionRpc } from './deletion-rpc.ts'
 import { wrapMethod } from './runtime-method.ts'
 import type { SessionDeletionPreview, SessionDeletionRequest } from './deletion-contract.ts'
 import { clearDisabledSearchIndex } from './disabled-search-index.ts'
@@ -128,10 +127,6 @@ export class ConversationDeletion extends TypertRemoteService {
 
   constructor(ctx: Context, private readonly config: { enabled: () => boolean }) {
     super(ctx, 'aeConversations')
-    ctx.typert.register({
-      package: deletionRpc.package, face: 'host', schemas: [],
-      model: { services: [], events: [], objects: [] }, invocations: deletionRpc.descriptors,
-    })
     this.ready = this.initialize()
   }
 

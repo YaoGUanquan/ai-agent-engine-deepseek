@@ -11,6 +11,7 @@ import { installSkills } from './skills.ts'
 import * as engineering from './engineering.ts'
 import { ConversationDeletion } from './conversation-deletion.ts'
 import { RoleCatalogService } from './roles-service.ts'
+import { pluginRpc } from './rpc.ts'
 
 export const name = 'ai-agent-engine'
 export const inject = ['loader', 'agentPresets', 'agents', 'sessions', 'sessionPersistence', 'sessionProjections', 'subagents', 'skills', 'typert']
@@ -30,6 +31,10 @@ export const Config = z.object({
 
 /** Install an optional native preset without changing the selected default. */
 export async function apply(ctx: Context, config: Config): Promise<void> {
+  ctx.typert.register({
+    package: pluginRpc.package, face: 'host', schemas: [],
+    model: { services: [], events: [], objects: [] }, invocations: pluginRpc.descriptors,
+  })
   ctx.plugin(ConversationDeletion, { enabled: () => config.conversationManagement.get() })
   ctx.plugin(RoleCatalogService, {
     enabled: () => config.rolesEnabled.get(),

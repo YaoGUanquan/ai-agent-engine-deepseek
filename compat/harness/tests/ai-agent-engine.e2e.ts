@@ -69,6 +69,18 @@ describe('AI Agent Engine real profile and browser', () => {
     expect((await scaffold.ctx.skills.list()).map(skill => skill.name)).toContain('ae-backend')
   })
 
+  it('activates deletion and roles together in the browser', async () => {
+    await page.getByRole('button', { name: 'Account menu', exact: true }).click()
+    await page.getByRole('menuitem', { name: 'Settings', exact: true }).click()
+    const settings = page.getByRole('dialog', { name: 'Settings', exact: true })
+    await settings.getByText('Engineering roles', { exact: true }).click()
+    await settings.locator('[data-ae-role-row="frontend"]').waitFor()
+    await settings.locator('[data-ae-role-row="backend"]').waitFor()
+    expect(await settings.locator('[data-ae-roles-settings] [role="alert"]').count()).toBe(0)
+    await settings.getByRole('button', { name: 'Close', exact: true }).click()
+    await settings.waitFor({ state: 'detached' })
+  })
+
   it('completes a simple scripted turn without creating teammates and deletes current and archived conversations', async () => {
     for (const archived of [false, true]) {
       const preset = archived ? 'ai-agent-engine' : 'standard'
@@ -387,7 +399,7 @@ describe('AI Agent Engine independent module composition', () => {
       expect((await fixture.ctx.skills.list()).some(row => row.name === 'ae-backend')).toBe(engineering)
       expect(fixture.ctx.get('agentTeams')).toBeDefined()
       expect(fixture.ctx.settings.describe().find(row => row.ns === 'ai-agent-engine')?.value)
-        .toEqual({ conversationManagement: true })
+        .toEqual({ conversationManagement: true, rolesEnabled: true })
       if (engineering) {
         const adapter = new MockAdapter(['hang'])
         fixture.ctx.llm.registerAdapter(['ae-coexist'], adapter)

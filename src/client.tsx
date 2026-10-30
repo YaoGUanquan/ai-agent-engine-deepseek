@@ -17,8 +17,7 @@ import { en, zh, type LocaleKey } from './locales.ts'
 import { conversationManagementEnabled } from './module-config.ts'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { installTeamPresentation } from './team-presentation.tsx'
-import { deletionRpc } from './deletion-rpc.ts'
-import { rolesRpc } from './roles-rpc.ts'
+import { pluginRpc } from './rpc.ts'
 import { RolesSettingsPage } from './roles-settings.tsx'
 import type { RolesRemote } from './roles-contract.ts'
 import { attachRowContextMenu } from './row-context-menu.ts'
@@ -99,8 +98,7 @@ async function mountClient(ctx: Context): Promise<void> {
   ctx.locale.register('ai-agent-engine', { en, zh })
   installTeamPresentation(ctx)
   const settings = ctx.configForms.describe()
-  await ctx.remote.$mount(deletionRpc)
-  await ctx.remote.$mount(rolesRpc)
+  await ctx.remote.$mount(pluginRpc)
   const remote = ctx.get('remote.aeConversations')
   if (!remote) throw new Error('AI Agent Engine conversation API namespace was not mounted')
   const leaveDeleted = (ids: readonly SessionId[]) => {
