@@ -14,7 +14,7 @@
 | 专业角色显示 | 团队面板和任务负责人显示“前端工程师”“后端工程师”等职责 |
 | 七项工程技能 | 覆盖需求澄清、前后端开发、单元测试、集成测试和浏览器测试 |
 | 永久删除对话 | 从对话菜单删除主对话及其所属队友记录，同时清理对应的缓存和搜索索引 |
-| 可配置工程角色（一期） | 用本机 `$DSH_HOME/ai-agent-engine/roles.json` 覆盖/追加 Lead 策略中的角色职责与技能映射；无自定义设置页 |
+| 可配置工程角色 | 本机 `$DSH_HOME/ai-agent-engine/roles.json` 覆盖/追加 Lead 策略；插件设置 **`settings.section`「工程角色」** 可可视化编辑 `skill`/`responsibility` 与自定义 id |
 
 简单任务可以由当前助手直接完成；需要分工时再组队。安装后可继续使用标准模式，也可以选择 **AI Agent Engine** 模式。
 
@@ -181,13 +181,13 @@ github:YaoGUanquan/ai-agent-engine-deepseek#v0.2.1
 
 若 `.ai-agent-engine/deletions/` 下某条删除记录文件损坏，插件会将其改名为 `*.json.corrupt` 并写入日志，跳过该条后继续启动，其余有效记录照常恢复。
 
-### 改了 roles.json，为什么旧队友没变？
+### 改了角色（设置页或 roles.json），为什么旧队友没变？
 
-一期约定：只影响**之后新创建**的队友。已 spawn 或冷恢复的实例不重绑提示词，路由名也保持创建时的值。
+约定：只影响**之后新创建**的队友。已 spawn 或冷恢复的实例不重绑提示词，路由名也保持创建时的值。设置页保存或 Host `aeRoles` 写回后会重建 Lead 策略，供新 spawn 使用。
 
 ### 如何恢复出厂工程角色？
 
-删除或清空 `$DSH_HOME/ai-agent-engine/roles.json`（若配置了 `rolesPath` 则删对应文件），或将 `rolesEnabled` 设为 `false`。不必为此卸载插件。正在进行的会话不应因清文件而崩溃。
+在设置 **「工程角色」** 中点击「恢复默认」（会删除同一 overlay 文件）；或手动删除/清空 `$DSH_HOME/ai-agent-engine/roles.json`（若配置了 `rolesPath` 则删对应文件）；也可将 `rolesEnabled` 设为 `false`。不必为此卸载插件。正在进行的会话不应因清文件而崩溃；已 spawn 队友不重绑。
 
 ### 角色文件损坏或路径无效会怎样？
 
@@ -195,11 +195,13 @@ github:YaoGUanquan/ai-agent-engine-deepseek#v0.2.1
 
 ### 能在设置页里可视化编辑角色吗？
 
-一期**没有**自定义角色设置页。请编辑 overlay 文件，并用插件配置中的 `rolesEnabled` / `rolesPath`。
+可以。打开宿主**设置**，在本插件的 **`settings.section`「工程角色」** 中编辑。可改 `skill`（技能）与 `responsibility`（职责），可添加自定义角色 id，可「恢复默认」。团队面板中文职称仍由 locales 决定，本页不改展示名。
+
+也可以继续手改 `$DSH_HOME/ai-agent-engine/roles.json`（或 `rolesPath`）；设置页与文件读写**同一份** overlay。保存后 Lead 策略会重建，**新创建**的队友生效；已 spawn 队友不重绑。
 
 ### 多个对话一起用前端/后端队友会不会串角色？
 
-无 overlay（或未启用合并）时，多对话并行或交替调用内置角色应保持默认种子行为、彼此不串。测侧已对 main tip `85600bac`（#5 / 0.2.3）验收通过：`check:all` 33/33、六条契约全过，以及多对话并发/交替冒烟（20+10）无串台。已创建队友不会因为你改 `roles.json` 而自动换提示词。
+无 overlay（或未启用合并）时，多对话并行或交替调用内置角色**应保持**默认种子行为、彼此不串。一期契约与多对话冒烟曾对 tip `85600bac`（#5）验收；二期设置页（tip `92a3189` / #7）相关多对话与设置持久化，**测侧进行中，本文不宣称已冒烟通过**。已创建队友不会因为你改设置页或 `roles.json` 而自动换提示词。
 
 ### 会改变默认模式或数据目录吗？
 
@@ -207,9 +209,9 @@ github:YaoGUanquan/ai-agent-engine-deepseek#v0.2.1
 
 ### 当前版本验证过哪些功能？
 
-`0.2.3` 增加可配置工程角色覆盖（`$DSH_HOME/ai-agent-engine/roles.json`）与相关单测（含 role-catalog）。测侧已对 main tip `85600bac`（#5）验收通过：`check:all` 33/33、六条契约全过、多对话并发/交替冒烟（20+10）无串台。完整 Desktop 实机双队友与永久删除的历史证据仍沿用 `0.2.0`/`0.2.1` 验收记录，详见 [VALIDATION](compat/harness/VALIDATION.md)。
+`0.2.3` 支持工程角色 overlay 与设置页可视化编辑（#5 文件契约 + #7 `settings.section`「工程角色」/`aeRoles`）。开发者本机可对 tip `92a3189` 跑通 `check:all`（含角色相关单测）。一期测侧曾对 tip `85600bac` 验收文件契约与多对话冒烟；**二期设置页与多对话回归测侧进行中，勿将「应保持」理解为已冒烟通过**。完整 Desktop 实机双队友与永久删除历史证据仍沿用 `0.2.0`/`0.2.1` 验收记录，详见 [VALIDATION](compat/harness/VALIDATION.md)。
 
-真实模型创建前后端队友、角色显示和永久删除功能的完整实机验收，仍来自 `0.2.0`/`0.2.1` 记录；本版本未重新删除用户既有对话做实机验收。无覆盖文件时，内置角色行为与 `0.2.2` / tip `6b638b7` 口径一致（已由上述测侧结果覆盖）。
+真实模型创建前后端队友、角色显示和永久删除功能的完整实机验收，仍来自 `0.2.0`/`0.2.1` 记录；本版本未重新删除用户既有对话做实机验收。无覆盖文件时，内置角色行为应与 `0.2.2` / tip `6b638b7` 口径一致。
 
 详细环境、检查结果和未验证范围见[验收记录](compat/harness/VALIDATION.md)。
 
@@ -249,19 +251,29 @@ node tools/harness-integration.mjs "<official-harness-source-directory>"
 
 已启用官方团队插件时，会复用它的服务和人数限制。`conversationManagement` 与 `rolesEnabled` 支持实时切换；其他配置修改后需要重新加载插件。请保留 `ai-agent-engine` 配置项的标识。
 
-#### 自定义子智能体角色（一期）
+#### 自定义子智能体角色（设置页 + 文件）
 
-一期可用**本机用户态文件**覆盖或追加工程队友在 Lead 协作策略中的职责说明与技能映射，无需改插件包或源码。**没有**单独的「角色设置」自定义页面；请直接编辑 overlay，并用上表的 `rolesEnabled` / `rolesPath` 控制是否启用与路径。
+可用**本机用户态 overlay**覆盖或追加工程队友在 Lead 协作策略中的职责说明与技能映射，无需改插件包或源码。
+
+##### 可视化设置（推荐）
+
+1. 打开宿主**设置**。
+2. 进入本插件的 **`settings.section`「工程角色」**（locales：`roles.section`）。
+3. 编辑内置或自定义角色的 **技能（`skill`）** 与 **职责（`responsibility`）**；可添加自定义角色 id；点击「保存覆盖」。
+4. 「恢复默认」会 **unlink/删除** 同一 overlay 文件，新队友回到出厂种子。
+
+Host 通过 `aeRoles`（`getCatalog` / `getOverlay` / `putOverlay` / `restoreDefaults`）读写；非法 payload **拒绝写入**（fail-closed）。写成功后发出 `ai-agent-engine/roles-updated`，重建 Lead 策略。**已 spawn / 冷恢复队友不重绑**；仅**新 spawn**使用合并结果。
+
+##### 文件与 Config（仍可用）
 
 - **默认路径**：`$DSH_HOME/ai-agent-engine/roles.json`（`$DSH_HOME` 为 Harness 用户数据根）
 - **可选路径**：配置 `rolesPath` 为绝对路径（修改后需重新加载插件；`rolesEnabled` 为 volatile，可实时开关）
 - **不要**把角色文件放进工作区 `.ai-agent-engine/`（该目录仍仅用于删除记录 journal）
-- **可覆盖字段**：仅 `skill`、`responsibility`（按角色 `id`）。团队面板上的中文职称（如「前端工程师」）仍由插件 locales 决定，一期 overlay **不**改 UI 展示名
+- **可覆盖字段**：仅 `skill`、`responsibility`（按角色 `id`）。团队面板中文职称仍由 locales 决定，**不**改 UI 展示名
 - **合并**：按 `id` 深合并到包内 builtin 种子；只覆盖文件中出现的字段；未知 `id` 追加。插件升级后，内置文案随包刷新，未在 overlay 中出现的字段跟随新种子
-- **新 spawn** 才读合并结果；**已创建 / 冷恢复的队友不重绑**提示词与路由名
-- **多对话**：无 overlay（或 `rolesEnabled=false`）时，多个对话并行或交替调用内置 frontend/backend 等角色，保持默认种子行为、彼此不串角色（测侧已对 tip `85600bac` 冒烟通过：并发/交替 20+10 无串台）
+- **多对话**：无 overlay（或 `rolesEnabled=false`）时，多对话并行/交替调用内置 frontend/backend 等角色**应保持**默认种子、彼此不串（二期相关测侧进行中，不宣称已冒烟通过）
 
-示例：
+示例（与设置页保存格式一致）：
 
 ```json
 {
@@ -273,7 +285,7 @@ node tools/harness-integration.mjs "<official-harness-source-directory>"
 }
 ```
 
-`version` 必须为 `1`。恢复默认：删除或清空该文件（或使用的 `rolesPath`）。JSON 损坏、非法条目或无效路径时记日志并回退内置表，**不**拖垮插件启动。overlay **不会**打进安装包或你的 git 仓库，也**不会**污染 deletions journal。
+`version` 必须为 `1`。JSON 损坏、非法条目或无效路径时读侧记日志并回退内置表，**不**拖垮插件启动；写侧校验失败则不落盘。overlay **不会**打进安装包或你的 git 仓库，也**不会**污染 deletions journal。
 
 ### 仓库结构
 
