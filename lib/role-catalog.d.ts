@@ -29,8 +29,6 @@ export interface RoleCatalogResult {
 }
 /** Packaged defaults; package upgrades refresh these, overlay only overrides recorded fields. */
 export declare const BUILTIN_ROLES: readonly RoleDefinition[];
-/** Resolve overlay path: explicit `rolesPath`, else `$DSH_HOME/ai-agent-engine/roles.json`. */
-export declare function resolveRolesFilePath(rolesPath?: string): string | undefined;
 export declare function isValidRoleId(id: unknown): id is string;
 /** Validate one overlay row; returns undefined when the row must be skipped. */
 export declare function normalizeOverlayEntry(raw: unknown, warn: (message: string, ...args: unknown[]) => void): RoleOverlayEntry | undefined;
@@ -42,8 +40,6 @@ export declare function normalizeOverlayEntry(raw: unknown, warn: (message: stri
 export declare function mergeRoleCatalog(builtin: readonly RoleDefinition[], overlay: readonly RoleOverlayEntry[]): RoleDefinition[];
 /** Parse roles.json; corrupt or illegal documents return undefined (caller falls back). */
 export declare function parseRolesFile(text: string, warn: (message: string, ...args: unknown[]) => void): RoleOverlayEntry[] | undefined;
-/** Load and merge overlay when enabled; never throws for IO or parse failures. */
-export declare function resolveRoleCatalog(options: RoleCatalogOptions): Promise<RoleCatalogResult>;
 /** English list used in Lead naming guidance. */
 export declare function formatRoleIds(roles: readonly RoleDefinition[]): string;
 /** Markdown skills table for Lead policy. */
@@ -53,3 +49,17 @@ export declare function formatRoleTable(roles: readonly RoleDefinition[]): strin
  * Unknown placeholders are left intact. Returns a new string; template is not mutated.
  */
 export declare function renderLeadPolicy(template: string, roles: readonly RoleDefinition[]): string;
+export declare class RoleOverlayValidationError extends Error {
+    readonly code: "ae-roles/invalid-overlay";
+    constructor(message: string);
+}
+/**
+ * Validate a candidate overlay document.
+ * Fail-closed: any illegal row or structure throws RoleOverlayValidationError.
+ */
+export declare function validateRolesFile(raw: unknown): RolesFile;
+/**
+ * Build a true overlay from an edited merged catalog: only dirty fields and
+ * custom ids are recorded so package upgrades still refresh unoverridden fields.
+ */
+export declare function diffRolesAgainstBuiltin(edited: readonly RoleDefinition[], builtin?: readonly RoleDefinition[]): RoleOverlayEntry[];
