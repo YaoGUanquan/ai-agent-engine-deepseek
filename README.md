@@ -88,10 +88,10 @@ github:YaoGUanquan/ai-agent-engine-deepseek#v0.2.3
 
 ### 如何回退
 
-先卸载当前插件，再用已发布的旧版本地址安装。例如回到 `0.2.1`：
+先卸载当前插件，再用已发布的旧版本地址安装。例如回到 `0.2.2`：
 
 ```text
-github:YaoGUanquan/ai-agent-engine-deepseek#v0.2.1
+github:YaoGUanquan/ai-agent-engine-deepseek#v0.2.2
 ```
 
 启用后重启 Desktop。回退只切换插件版本，不会恢复已经永久删除的对话。
