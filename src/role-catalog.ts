@@ -1,8 +1,5 @@
 /** Builtin engineering roles and user overlay merge for Lead policy. */
 
-import { readFile } from 'node:fs/promises'
-import { join } from 'node:path'
-
 /** One spawnable engineering role consumed by Lead policy text. */
 export interface RoleDefinition {
   readonly id: string
@@ -51,15 +48,6 @@ const ROLE_ID = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/
 
 /** Reserved Lead identity; never a spawnable catalog entry. */
 const RESERVED = new Set(['lead'])
-
-/** Resolve overlay path: explicit `rolesPath`, else `$DSH_HOME/ai-agent-engine/roles.json`. */
-export function resolveRolesFilePath(rolesPath?: string): string | undefined {
-  const explicit = rolesPath?.trim()
-  if (explicit) return explicit
-  const home = process.env.DSH_HOME?.trim()
-  if (!home) return undefined
-  return join(home, 'ai-agent-engine', 'roles.json')
-}
 
 export function isValidRoleId(id: unknown): id is string {
   return typeof id === 'string' && ROLE_ID.test(id) && !RESERVED.has(id)
@@ -169,30 +157,6 @@ export function parseRolesFile(
   return roles
 }
 
-/** Load and merge overlay when enabled; never throws for IO or parse failures. */
-export async function resolveRoleCatalog(options: RoleCatalogOptions): Promise<RoleCatalogResult> {
-  const warn = options.warn ?? (() => undefined)
-  const builtin = BUILTIN_ROLES.map(role => ({ ...role }))
-  if (!options.enabled) return { roles: builtin, source: 'builtin' }
-
-  const path = resolveRolesFilePath(options.path)
-  if (!path) return { roles: builtin, source: 'builtin' }
-
-  let text: string
-  try {
-    text = await readFile(path, 'utf8')
-  } catch (error) {
-    const code = (error as NodeJS.ErrnoException).code
-    if (code === 'ENOENT') return { roles: builtin, source: 'builtin', path }
-    warn('Failed to read role overlay at %s (%s); using builtin roles', path, code ?? 'error')
-    return { roles: builtin, source: 'builtin', path }
-  }
-
-  const overlay = parseRolesFile(text, warn)
-  if (!overlay) return { roles: builtin, source: 'builtin', path }
-  return { roles: mergeRoleCatalog(builtin, overlay), source: 'merged', path }
-}
-
 /** English list used in Lead naming guidance. */
 export function formatRoleIds(roles: readonly RoleDefinition[]): string {
   const ids = roles.map(role => role.id)
@@ -217,4 +181,87 @@ export function renderLeadPolicy(template: string, roles: readonly RoleDefinitio
   return template
     .replaceAll('{{ROLE_IDS}}', formatRoleIds(roles))
     .replaceAll('{{ROLE_TABLE}}', formatRoleTable(roles))
+}
+
+
+export class RoleOverlayValidationError extends Error {
+  readonly code = 'ae-roles/invalid-overlay' as const
+  constructor(message: string) {
+    super(message)
+    this.name = 'RoleOverlayValidationError'
+  }
+}
+
+/**
+ * Validate a candidate overlay document.
+ * Fail-closed: any illegal row or structure throws RoleOverlayValidationError.
+ */
+export function validateRolesFile(raw: unknown): RolesFile {
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
+    throw new RoleOverlayValidationError('Role overlay root must be an object')
+  }
+  const document = raw as Record<string, unknown>
+  if (document.version !== 1) {
+    throw new RoleOverlayValidationError(`Role overlay version is unsupported (${String(document.version)})`)
+  }
+  if (!Array.isArray(document.roles)) {
+    throw new RoleOverlayValidationError('Role overlay roles must be an array')
+  }
+  const roles: RoleOverlayEntry[] = []
+  const seen = new Set<string>()
+  const problems: string[] = []
+  for (const [index, row] of document.roles.entries()) {
+    const warnings: string[] = []
+    const entry = normalizeOverlayEntry(row, message => { warnings.push(message) })
+    if (!entry) {
+      problems.push(`roles[${index}]: ${warnings[0] ?? 'invalid entry'}`)
+      continue
+    }
+    if (seen.has(entry.id)) {
+      problems.push(`roles[${index}]: duplicate id ${entry.id}`)
+      continue
+    }
+    seen.add(entry.id)
+    roles.push(entry)
+  }
+  if (problems.length > 0) {
+    throw new RoleOverlayValidationError(`Role overlay rejected: ${problems.join('; ')}`)
+  }
+  return { version: 1, roles }
+}
+
+/**
+ * Build a true overlay from an edited merged catalog: only dirty fields and
+ * custom ids are recorded so package upgrades still refresh unoverridden fields.
+ */
+export function diffRolesAgainstBuiltin(
+  edited: readonly RoleDefinition[],
+  builtin: readonly RoleDefinition[] = BUILTIN_ROLES,
+): RoleOverlayEntry[] {
+  const builtinById = new Map(builtin.map(role => [role.id, role]))
+  const overlay: RoleOverlayEntry[] = []
+  for (const role of edited) {
+    if (!isValidRoleId(role.id)) continue
+    const base = builtinById.get(role.id)
+    if (!base) {
+      overlay.push({
+        id: role.id,
+        skill: role.skill,
+        responsibility: role.responsibility ?? '',
+      })
+      continue
+    }
+    const entry: RoleOverlayEntry = { id: role.id }
+    let dirty = false
+    if (role.skill !== undefined && role.skill !== base.skill) {
+      Object.assign(entry, { skill: role.skill })
+      dirty = true
+    }
+    if (role.responsibility !== undefined && role.responsibility !== base.responsibility) {
+      Object.assign(entry, { responsibility: role.responsibility })
+      dirty = true
+    }
+    if (dirty) overlay.push(entry)
+  }
+  return overlay
 }

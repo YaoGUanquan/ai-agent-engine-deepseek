@@ -5,7 +5,8 @@ import * as teamTools from '@deepseek-ai/dsh-experimental-tool-agent-team'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-agent-preset-registry'
 import type {} from '@deepseek-ai/dsh-system-prompt'
-import { renderLeadPolicy, resolveRoleCatalog } from './role-catalog.ts'
+import { renderLeadPolicy } from './role-catalog.ts'
+import { resolveRoleCatalog } from './role-catalog-io.ts'
 
 export const name = 'ai-agent-engine-engineering'
 export const inject = ['systemPrompt', 'tools', 'agents', 'agentTeams', 'agentPresets']
@@ -85,7 +86,7 @@ export async function apply(ctx: Context, config: EngineeringConfig): Promise<vo
     installed.get(agent)?.()
     installed.delete(agent)
   })
-  ctx.on('loader/volatile-update', () => {
+  const refreshPolicy = (): void => {
     void (async () => {
       try {
         policy = await buildEngineeringPolicy(config, warn)
@@ -94,7 +95,9 @@ export async function apply(ctx: Context, config: EngineeringConfig): Promise<vo
         warn('Failed to refresh engineering role policy: %s', error instanceof Error ? error.message : error)
       }
     })()
-  })
+  }
+  ctx.on('loader/volatile-update', refreshPolicy)
+  ctx.on('ai-agent-engine/roles-updated', refreshPolicy)
   ctx.effect(() => () => {
     for (const dispose of installed.values()) dispose()
     installed.clear()
