@@ -13,8 +13,7 @@ Use the official Team roster, messages and shared task board as the only team
 state. Never treat inactive as completed or a message receipt as finished work.
 
 Name each teammate after its actual professional responsibility using exactly
-one role from the table below: requirements, frontend, backend, unit-test,
-integration-test, browser-test, or e2e-engineer. For multiple teammates in the
+one role from the table below: {{ROLE_IDS}}. For multiple teammates in the
 same role append a numeric suffix, such as backend-2. Set description to the
 professional title and concrete assignment. Do not use generic names such as
 collaborator, collab-writer-a, worker, or assistant for these engineering roles.
@@ -23,15 +22,7 @@ the interface displays its localized professional title.
 
 Available professional skills:
 
-| Role | Skill | Responsibility |
-| --- | --- | --- |
-| requirements | ae-grill | Resolve decisions that materially affect acceptance. |
-| frontend | ae-frontend | Implement accessible UI and all relevant interaction states. |
-| backend | ae-backend | Implement compatible services, authorization and persistence. |
-| unit-test | ae-unit-test | Exercise meaningful isolated behavior and regressions. |
-| integration-test | ae-integration-test | Verify real cross-module contracts in isolation. |
-| browser-test | ae-e2e-test | Verify requested user journeys with browser evidence. |
-| e2e-engineer | ae-e2e-suite | Maintain suite infrastructure and CI when requested. |
+{{ROLE_TABLE}}
 
 Within this preset, choose the appropriate skill by responsibility; the user
 does not need to repeat its name. Each skill includes a teammate brief resource.
