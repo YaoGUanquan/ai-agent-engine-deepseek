@@ -5,14 +5,16 @@ import { describe, expect, it } from 'vitest'
 import {
   BUILTIN_ROLES,
   RoleOverlayValidationError,
-  deleteRolesFile,
   diffRolesAgainstBuiltin,
   mergeRoleCatalog,
+  validateRolesFile,
+} from '../src/role-catalog.ts'
+import {
+  deleteRolesFile,
   readOverlayDocument,
   resolveRoleCatalog,
-  validateRolesFile,
   writeRolesFile,
-} from '../src/role-catalog.ts'
+} from '../src/role-catalog-io.ts'
 
 describe('role overlay write path', () => {
   it('writes atomically and rejects invalid payloads without persisting', async () => {

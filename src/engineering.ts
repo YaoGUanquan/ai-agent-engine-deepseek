@@ -5,7 +5,8 @@ import * as teamTools from '@deepseek-ai/dsh-experimental-tool-agent-team'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-agent-preset-registry'
 import type {} from '@deepseek-ai/dsh-system-prompt'
-import { renderLeadPolicy, resolveRoleCatalog } from './role-catalog.ts'
+import { renderLeadPolicy } from './role-catalog.ts'
+import { resolveRoleCatalog } from './role-catalog-io.ts'
 
 export const name = 'ai-agent-engine-engineering'
 export const inject = ['systemPrompt', 'tools', 'agents', 'agentTeams', 'agentPresets']

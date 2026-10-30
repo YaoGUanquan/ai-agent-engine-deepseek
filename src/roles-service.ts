@@ -4,13 +4,15 @@ import type {} from '@deepseek-ai/dsh-typert-registry'
 import {
   BUILTIN_ROLES,
   RoleOverlayValidationError,
-  deleteRolesFile,
   mergeRoleCatalog,
+} from './role-catalog.ts'
+import {
+  deleteRolesFile,
   readOverlayDocument,
   resolveRoleCatalog,
   resolveRolesFilePath,
   writeRolesFile,
-} from './role-catalog.ts'
+} from './role-catalog-io.ts'
 import { rolesRpc } from './roles-rpc.ts'
 import type {
   RolesCatalogView,

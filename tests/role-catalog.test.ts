@@ -9,9 +9,8 @@ import {
   mergeRoleCatalog,
   parseRolesFile,
   renderLeadPolicy,
-  resolveRoleCatalog,
-  resolveRolesFilePath,
 } from '../src/role-catalog.ts'
+import { resolveRoleCatalog, resolveRolesFilePath } from '../src/role-catalog-io.ts'
 import { buildEngineeringPolicy } from '../src/engineering.ts'
 
 describe('role catalog builtins', () => {
