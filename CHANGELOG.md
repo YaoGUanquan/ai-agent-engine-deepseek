@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased（合入 #12 后；未发版）
+
+- 可选（默认关）：设置「能力增强 / 破甲」——`capabilityEnhanceEnabled` / `jailbreakEnabled`；破甲真源 `$DSH_HOME/ai-agent-engine/prompt-override.md` → `systemPrompt.section`；增强为插件内可控策略段（`enhanceProfile` 空/`default`）；`aeCapability` RPC（owner-only）；与 `roles.json` /「工程角色」分真源；已 spawn 不重绑。
+- **不做**宿主 Apply / Desktop 补丁 / Clean·Drill / 第三方破甲正文；不等于 dsh-purge 全能清洗。概念致谢见 NOTICE。
+- 文档：README 对齐上述契约；安装 pin 仍为现网 `#v0.2.4`（本条不构成新 Release）。
+
 ## 0.2.4 - 2026-10-30
 
 - 文档：README 安装/升级/确认/下载地址改为 `#v0.2.4` 与 `0.2.4.tgz`；回退示例改为 `#v0.2.3`；去掉“尚未发布”措辞。

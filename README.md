@@ -4,7 +4,7 @@
 
 本项目参考 [AI Agent Engine for Codex](https://github.com/YaoGUanquan/codex-ai-agent-engine)，将其七项工程技能适配为 DeepSeek Harness 原生插件。
 
-[功能介绍](#功能介绍) · [安装](#安装) · [更新与回退](#更新与回退) · [快速使用](#快速使用) · [常见问题](#常见问题) · [版本下载](https://github.com/YaoGUanquan/ai-agent-engine-deepseek/releases)
+[功能介绍](#功能介绍) · [安装](#安装) · [更新与回退](#更新与回退) · [快速使用](#快速使用) · [能力增强与破甲](#能力增强与破甲可选默认关闭) · [常见问题](#常见问题) · [版本下载](https://github.com/YaoGUanquan/ai-agent-engine-deepseek/releases)
 
 ## 功能介绍
 
@@ -15,6 +15,7 @@
 | 七项工程技能 | 覆盖需求澄清、前后端开发、单元测试、集成测试和浏览器测试 |
 | 永久删除对话 | 从对话菜单删除主对话及其所属队友记录，同时清理对应的缓存和搜索索引 |
 | 可配置工程角色 | 本机 `$DSH_HOME/ai-agent-engine/roles.json` 覆盖/追加 Lead 策略；插件设置 **`settings.section`「工程角色」** 可可视化编辑 `skill`/`responsibility` 与自定义 id |
+| 能力增强 / 破甲（可选） | 设置 **「能力增强 / 破甲」**：默认关闭；增强为插件内可控策略段；破甲为 `$DSH_HOME/ai-agent-engine/prompt-override.md` → `systemPrompt.section`；**不**改 Desktop / `@deepseek-ai` |
 
 简单任务可以由当前助手直接完成；需要分工时再组队。安装后可继续使用标准模式，也可以选择 **AI Agent Engine** 模式。
 
@@ -176,6 +177,46 @@ github:YaoGUanquan/ai-agent-engine-deepseek#v0.2.3
 
 **永久删除无法撤销。** 项目文件和独立分叉对话会保留；独立分叉中已经复制的历史、外部备份也会保留。此操作仅允许当前 Harness 的所有者执行。
 
+
+## 能力增强与破甲（可选，默认关闭）
+
+本插件可选提供两项**默认关闭**的能力，互不影响，也可与「工程角色」同时使用。关闭任一开关时，对应路径**完全旁路**，行为与未开启时一致。
+
+| 能力 | 配置键 | 默认 | 做什么 |
+| --- | --- | --- | --- |
+| 模型能力增强 | `capabilityEnhanceEnabled` | 关 | 在**插件内**注入受控策略段（技能/工具选择、轻度协作、证据向验证）；方案字段 `enhanceProfile` 一期接受空或 `default`，非法值隔离不应用 |
+| 破甲 | `jailbreakEnabled` | 关 | 仅通过插件 `systemPrompt.section` 注入覆盖层文本；真源为 `$DSH_HOME/ai-agent-engine/prompt-override.md`（或 Config `jailbreakPromptPath`）；**不会**修改本机 `@deepseek-ai` 安装包，也**不会**对 Desktop 做 Apply/补丁 |
+
+拼接顺序（本插件自有段）：Lead 工程策略（order 700）→ 破甲覆盖层（740）→ 能力增强（780）。Host RPC：`aeCapability`（`getStatus` / `getOverride` / `putOverride` / `restoreOverride`，仅所有者）。
+
+### 如何开启 / 关闭
+
+1. 打开宿主**设置**，进入本插件的 **「能力增强 / 破甲」**（locales：`capability.section`；与「工程角色」并列）。
+2. 打开对应总开关。**开启后才会展开**增强方案或破甲提示词编辑区（总开关旁路 UX）。
+3. 保存。仅 **Host 所有者**可读写；非法内容拒绝保存（fail-closed）。破甲长文本经 `aeCapability` 写入覆盖文件；设置页不把长文持久化进 Config。
+4. 关闭开关即完全旁路对应路径。
+5. 「恢复默认」：两个开关关闭，并清除可选字段与覆盖文件。
+
+### 与「工程角色」的关系
+
+- 可同时使用：工程角色仍通过 `$DSH_HOME/ai-agent-engine/roles.json`（或 `rolesPath`）与 settings「工程角色」/ `aeRoles` 管理；与 `prompt-override.md` **分真源**。
+- **已创建（已 spawn）的队友不会因本页开关或覆盖保存而重绑提示词**；新会话 / 新 spawn 在开关打开时才会带上对应段。
+- 破甲覆盖层不是工程角色表，也不替代 Lead 协作策略；亦不同于第三方「系统提示词 / 预设管理」插件——若同装请避免多处改写同一语义，关闭本页两开关后本插件不再注入上述两段。
+
+### 风险与合规
+
+- **仅用于你有权管理的本机官方 DeepSeek Harness**，以及合法授权的评测场景。
+- **不要**用于未授权系统、违法违规内容或违反模型服务商条款的用途；后果由使用者自行承担。
+- **不等于** [dsh-purge](https://github.com/YuJunZhiXue/dsh-purge) 的「清洗 Apply / 演练台 / 宿主补丁 / 加密提示词库」。本插件**不做**宿主文件补丁，也**不**内置第三方破甲提示词正文。概念致谢见 [NOTICE.md](NOTICE.md)。
+- 可随时关闭；关闭后不再应用增强策略或破甲覆盖层。
+
+### 明确不做（Phase-1）
+
+- 不修改 Desktop / 不写 `@deepseek-ai` 补丁、不提供 Clean/Drill 侧栏
+- 不附带公网攻击载荷或红队技能包下发
+- 不把破甲做成抢占式全局 agent preset；不做独立 APEX 模式 / Teams 大改 / 浏览器验证套件
+- 安装 pin 仍以当前正式版说明为准（现网 `#v0.2.4`）；本功能随后续合入与发版节奏上线，**不以本文冒充已发布的 v0.2.4 Release 能力清单之外的保证**
+
 ## 常见问题
 
 ### 安装后为什么需要重启？
@@ -222,6 +263,10 @@ github:YaoGUanquan/ai-agent-engine-deepseek#v0.2.3
 
 无 overlay（或未启用合并）时，多对话并行或交替调用内置角色**应保持**默认种子行为、彼此不串。一期契约与多对话冒烟曾对 tip `85600bac`（#5）验收；二期设置页（tip `92a3189` / #7）相关多对话与设置持久化，**测侧进行中，本文不宣称已冒烟通过**。已创建队友不会因为你改设置页或 `roles.json` 而自动换提示词。
 
+### 能力增强 / 破甲会改 Desktop 或工程角色吗？
+
+不会改 Desktop，也不会写 `@deepseek-ai` 补丁。破甲只读写 `$DSH_HOME/ai-agent-engine/prompt-override.md`（或你配置的路径）并经 `systemPrompt.section` 注入；工程角色仍用 `roles.json` /「工程角色」。默认两开关均为关闭。详见[能力增强与破甲](#能力增强与破甲可选默认关闭)。
+
 ### 会改变默认模式或数据目录吗？
 
 已有默认模式保持不变。插件沿用 Harness 已配置的会话和数据目录。角色 overlay 默认落在 `$DSH_HOME/ai-agent-engine/`，不写入项目工作区。
@@ -267,8 +312,13 @@ node tools/harness-integration.mjs "<official-harness-source-directory>"
 | `maxMembers` | `8` | 本插件创建团队服务时允许的队友数量上限 |
 | `rolesEnabled` | `true` | 是否读取用户角色覆盖文件并合并进 Lead 策略 |
 | `rolesPath` | 空 | 可选绝对路径；空则使用 `$DSH_HOME/ai-agent-engine/roles.json` |
+| `capabilityEnhanceEnabled` | `false` | 是否启用模型能力增强（插件内策略段；关=全旁路） |
+| `jailbreakEnabled` | `false` | 是否启用破甲提示词覆盖层（关=不注入） |
+| `enhanceProfile` | 空 | 增强方案；一期接受空或 `default`，非法值隔离 |
+| `jailbreakPromptPath` | 空 | 可选覆盖文件绝对路径；空则 `$DSH_HOME/ai-agent-engine/prompt-override.md` |
+| `jailbreakPrompt` | 空 | 可选内联短文本；设置页长文以覆盖文件为准，通常保持为空 |
 
-已启用官方团队插件时，会复用它的服务和人数限制。`conversationManagement` 与 `rolesEnabled` 支持实时切换；其他配置修改后需要重新加载插件。请保留 `ai-agent-engine` 配置项的标识。
+已启用官方团队插件时，会复用它的服务和人数限制。`conversationManagement`、`rolesEnabled`、`capabilityEnhanceEnabled` 与 `jailbreakEnabled` 等 volatile 项可在设置中切换；其他需重载的配置修改后请重新加载插件。请保留 `ai-agent-engine` 配置项的标识。
 
 #### 自定义子智能体角色（设置页 + 文件）
 
