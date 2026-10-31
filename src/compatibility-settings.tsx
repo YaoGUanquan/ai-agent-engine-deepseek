@@ -43,7 +43,7 @@ export function CompatibilitySettingsPage({ remote, clientStatuses, t }: PropsLo
     <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse' }}>
       <thead><tr>{(['module', 'host', 'client'] as const).map(label =>
         <th key={label} scope="col" style={cell}>{t(`compatibility.${label}`)}</th>)}</tr></thead>
-      <tbody>{(['engineering', 'roles', 'deletion'] as ModuleId[]).map(id =>
+      <tbody>{(['engineering', 'roles', 'capability', 'deletion'] as ModuleId[]).map(id =>
         <tr key={id}><th scope="row" style={cell}>{t(`compatibility.${id}`)}</th>
           <td style={cell}>{text(host?.[id])}</td><td style={cell}>{text(client[id])}</td></tr>)}</tbody>
     </table>

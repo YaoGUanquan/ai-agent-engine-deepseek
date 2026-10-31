@@ -1,5 +1,5 @@
 import type { Context } from '@deepseek-ai/cordis';
-export type ModuleId = 'engineering' | 'roles' | 'deletion';
+export type ModuleId = 'engineering' | 'roles' | 'deletion' | 'capability';
 export interface ModuleStatus {
     state: 'waiting' | 'ready' | 'unavailable';
     reason?: 'services' | 'interface' | 'initialization' | 'storage';

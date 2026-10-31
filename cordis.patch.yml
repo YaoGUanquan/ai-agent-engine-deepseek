@@ -7,3 +7,8 @@
         maxMembers: 8
         rolesEnabled: true
         rolesPath: ''
+        capabilityEnhanceEnabled: false
+        jailbreakEnabled: false
+        enhanceProfile: ''
+        jailbreakPromptPath: ''
+        jailbreakPrompt: ''

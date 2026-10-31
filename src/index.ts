@@ -10,9 +10,11 @@ import { initialModuleStatuses, mountModule } from './module-runtime.ts'
 export const name = 'ai-agent-engine'
 export const inject = ['typert']
 
-export interface Config extends Omit<PluginConfig, 'conversationManagement' | 'rolesEnabled'> {
+export interface Config extends Omit<PluginConfig, 'conversationManagement' | 'rolesEnabled' | 'capabilityEnhanceEnabled' | 'jailbreakEnabled'> {
   conversationManagement: Volatile<boolean>
   rolesEnabled: Volatile<boolean>
+  capabilityEnhanceEnabled: Volatile<boolean>
+  jailbreakEnabled: Volatile<boolean>
 }
 
 export const Config = z.object({
@@ -21,6 +23,11 @@ export const Config = z.object({
   maxMembers: z.natural().min(1).default(8),
   rolesEnabled: z.boolean().default(true).volatile(),
   rolesPath: z.string().default(''),
+  capabilityEnhanceEnabled: z.boolean().default(false).volatile(),
+  jailbreakEnabled: z.boolean().default(false).volatile(),
+  enhanceProfile: z.string().default(''),
+  jailbreakPromptPath: z.string().default(''),
+  jailbreakPrompt: z.string().default(''),
 })
 
 /** Install an optional native preset without changing the selected default. */
@@ -35,6 +42,16 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
     const { RoleCatalogService } = await import('./roles-service.ts')
     await scope.plugin(RoleCatalogService, {
       enabled: () => config.rolesEnabled.get(), rolesPath: config.rolesPath,
+    })
+  })
+  // Capability / jailbreak RPC always mounts (settings + overlay IO); injection is gated in engineering.
+  mountModule(ctx, 'capability', ['typert'], {}, statuses, async scope => {
+    const { CapabilityPolicyService } = await import('./capability-service.ts')
+    await scope.plugin(CapabilityPolicyService, {
+      capabilityEnhanceEnabled: () => config.capabilityEnhanceEnabled.get(),
+      jailbreakEnabled: () => config.jailbreakEnabled.get(),
+      jailbreakPromptPath: config.jailbreakPromptPath,
+      enhanceProfile: config.enhanceProfile,
     })
   })
   mountModule(ctx, 'deletion', [
@@ -91,6 +108,11 @@ async function installEngineering(ctx: Context, config: Config, statuses: import
       teamTools: !globalTeamTools,
       rolesEnabled: () => config.rolesEnabled.get(),
       rolesPath: config.rolesPath,
+      capabilityEnhanceEnabled: () => config.capabilityEnhanceEnabled.get(),
+      jailbreakEnabled: () => config.jailbreakEnabled.get(),
+      enhanceProfile: config.enhanceProfile,
+      jailbreakPromptPath: config.jailbreakPromptPath,
+      jailbreakPrompt: config.jailbreakPrompt,
     })
     await ready.plugin(AgentPreset, {
       id: 'ai-agent-engine',
