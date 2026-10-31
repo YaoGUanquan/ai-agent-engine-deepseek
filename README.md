@@ -24,7 +24,7 @@
 
 | 项目 | 当前支持范围 |
 | --- | --- |
-| 插件版本（当前源码，尚未发布） | `0.2.4` |
+| 插件版本 | `0.2.4` |
 | DeepSeek Harness（允许加载） | `>=0.2.1-rc.5 <0.2.2-0` |
 | 实际运行验证基线 | `0.2.1-rc.5` |
 | Desktop 实机验证 | Windows 原版 Desktop |
@@ -35,9 +35,8 @@
 允许加载不代表未来版本已经完成运行验证。`0.2.2`（含预发布版）需要另行适配。
 开发依赖固定 `rc.5`，运行依赖及 peer 使用上述兼容范围。
 已发布的 `v0.2.3` 标签及 Release 安装包仍只声明支持 `rc.3`；
-本次适配需安装新构建的 `ai-agent-engine-deepseek-0.2.4.tgz`，
-不能靠重新安装原有固定标签获得修复。以下 GitHub 安装示例是已发布的旧版本；
-`github:YaoGUanquan/ai-agent-engine-deepseek#v0.2.4` 仅在该标签正式发布后可用。
+本次适配需安装 `0.2.4`（GitHub `#v0.2.4` 或 `ai-agent-engine-deepseek-0.2.4.tgz`），
+不能靠重新安装原有固定标签获得修复。以下安装示例即当前版本 pin。
 
 ### 自动兼容与降级
 
@@ -58,7 +57,7 @@
 4. 完全退出并重新打开 Desktop。
 
 ```text
-github:YaoGUanquan/ai-agent-engine-deepseek#v0.2.3
+github:YaoGUanquan/ai-agent-engine-deepseek#v0.2.4
 ```
 
 安装包已包含构建产物。普通用户无需安装 Node.js、执行脚本或构建源码，也无需替换 Desktop。
@@ -67,7 +66,7 @@ github:YaoGUanquan/ai-agent-engine-deepseek#v0.2.3
 
 ### 下载安装包
 
-也可以打开 [Releases](https://github.com/YaoGUanquan/ai-agent-engine-deepseek/releases/latest)，下载 `ai-agent-engine-deepseek-0.2.3.tgz`，在插件管理器的“包名或地址”中填写该文件的绝对路径，再安装、启用并重启。
+也可以打开 [Releases](https://github.com/YaoGUanquan/ai-agent-engine-deepseek/releases/latest)，下载 `ai-agent-engine-deepseek-0.2.4.tgz`，在插件管理器的“包名或地址”中填写该文件的绝对路径，再安装、启用并重启。
 
 每个 Release 都提供版本说明、兼容范围和 `SHA256SUMS.txt` 校验文件。普通用户选择 `.tgz` 插件包即可；GitHub 自动生成的 “Source code” 是源码归档，供开发者使用。
 
@@ -75,9 +74,9 @@ github:YaoGUanquan/ai-agent-engine-deepseek#v0.2.3
 
 ### 能直接在插件里点击更新吗？
 
-当前适配的 Harness `0.2.1-rc.3` 仅为按需安装的官方插件提供“更新”入口。此插件属于第三方插件，**目前需要在插件页先卸载旧版，再安装新版**，没有自动下载或静默升级功能。
+当前适配范围内的 Harness（允许加载 `>=0.2.1-rc.5 <0.2.2-0`，验证基线 `0.2.1-rc.5`）仅为按需安装的官方插件提供“更新”入口。此插件属于第三方插件，**目前需要在插件页先卸载旧版，再安装新版**，没有自动下载或静默升级功能。
 
-安装地址中的 `#v0.2.3` 表示固定版本。重新启动 Desktop 不会自动变成未来的新版本。
+安装地址中的 `#v0.2.4` 表示固定版本。重新启动 Desktop 不会自动变成未来的新版本。
 
 ### 如何升级
 
@@ -87,10 +86,10 @@ github:YaoGUanquan/ai-agent-engine-deepseek#v0.2.3
 4. 点击 **添加插件**，填写新版本页面提供的安装地址。
 5. 安装并启用后，完全退出并重新打开 Desktop。Windows 下也要退出系统托盘中的后台实例，再核对版本和配置。
 
-例如，从 `0.2.1` 升级到当前版本时填写：
+例如，从 `0.2.3` 升级到当前版本时填写：
 
 ```text
-github:YaoGUanquan/ai-agent-engine-deepseek#v0.2.3
+github:YaoGUanquan/ai-agent-engine-deepseek#v0.2.4
 ```
 
 卸载插件不会替你删除已有对话。更新期间也不需要移除 Harness 的会话目录、记忆或项目文件。
@@ -98,20 +97,20 @@ github:YaoGUanquan/ai-agent-engine-deepseek#v0.2.3
 ### 如何确认升级成功
 
 1. 在[最新版本页面](https://github.com/YaoGUanquan/ai-agent-engine-deepseek/releases/latest)确认最新正式版本号。
-2. 安装完成时，核对“已安装”提示中的版本；当前应为 `0.2.3`。
-3. 重启后，在 **插件** 页打开 `ai-agent-engine-deepseek`，核对版本、安装来源和启用状态；当前 GitHub 安装来源应包含 `#v0.2.3`。
+2. 安装完成时，核对“已安装”提示中的版本；当前应为 `0.2.4`。
+3. 重启后，在 **插件** 页打开 `ai-agent-engine-deepseek`，核对版本、安装来源和启用状态；当前 GitHub 安装来源应包含 `#v0.2.4`。
 4. 打开原有对话，确认历史仍可查看；已有自定义配置也应重新核对。
 
-插件版本 `0.2.3` 与 Harness 版本 `0.2.1-rc.3` 是两个不同的版本号。更新插件不会替你升级或替换 Desktop。
+插件版本 `0.2.4` 与 Harness 版本（允许加载 `>=0.2.1-rc.5 <0.2.2-0`）是两个不同的版本号。更新插件不会替你升级或替换 Desktop。
 
 如果重启后仍显示旧版，请先确认卸载、安装操作发生在当前正在使用的 Desktop 中，再检查是否还有旧的后台实例。只下载 `.tgz` 或只打开 Release 页面不会更新已安装插件。
 
 ### 如何回退
 
-先卸载当前插件，再用已发布的旧版本地址安装。例如回到 `0.2.2`：
+先卸载当前插件，再用已发布的旧版本地址安装。例如回到 `0.2.3`：
 
 ```text
-github:YaoGUanquan/ai-agent-engine-deepseek#v0.2.2
+github:YaoGUanquan/ai-agent-engine-deepseek#v0.2.3
 ```
 
 启用后重启 Desktop。回退只切换插件版本，不会恢复已经永久删除的对话。
@@ -229,7 +228,7 @@ github:YaoGUanquan/ai-agent-engine-deepseek#v0.2.2
 
 ### 当前版本验证过哪些功能？
 
-`0.2.3` 支持工程角色 overlay 与设置页可视化编辑（#5 文件契约 + #7 `settings.section`「工程角色」/`aeRoles`）。开发者本机可对 tip `92a3189` 跑通 `check:all`（含角色相关单测）。一期测侧曾对 tip `85600bac` 验收文件契约与多对话冒烟；**二期设置页与多对话回归测侧进行中，勿将「应保持」理解为已冒烟通过**。完整 Desktop 实机双队友与永久删除历史证据仍沿用 `0.2.0`/`0.2.1` 验收记录，详见 [VALIDATION](compat/harness/VALIDATION.md)。
+`0.2.4` 在 `0.2.3` 工程角色能力之上，将宿主兼容范围改为 `>=0.2.1-rc.5 <0.2.2-0`（详见 CHANGELOG）。`0.2.3` 起支持工程角色 overlay 与设置页可视化编辑（#5 文件契约 + #7 `settings.section`「工程角色」/`aeRoles`）。开发者本机可对 tip `92a3189` 跑通 `check:all`（含角色相关单测）。一期测侧曾对 tip `85600bac` 验收文件契约与多对话冒烟；**二期设置页与多对话回归测侧进行中，勿将「应保持」理解为已冒烟通过**。完整 Desktop 实机双队友与永久删除历史证据仍沿用 `0.2.0`/`0.2.1` 验收记录，详见 [VALIDATION](compat/harness/VALIDATION.md)。
 
 真实模型创建前后端队友、角色显示和永久删除功能的完整实机验收，仍来自 `0.2.0`/`0.2.1` 记录；本版本未重新删除用户既有对话做实机验收。无覆盖文件时，内置角色行为应与 `0.2.2` / tip `6b638b7` 口径一致。
 
@@ -247,7 +246,7 @@ npm run check:all
 npm pack
 ```
 
-构建后可在 Desktop 插件管理器中安装生成的 `ai-agent-engine-deepseek-0.2.3.tgz`。提交源码变更时应同步构建产物 `lib/`，保证 Git 地址安装可直接使用。
+构建后可在 Desktop 插件管理器中安装生成的 `ai-agent-engine-deepseek-0.2.4.tgz`。提交源码变更时应同步构建产物 `lib/`，保证 Git 地址安装可直接使用。
 
 使用未修改的官方 Harness `dsh-v0.2.1-rc.5` 源码完成依赖安装和构建后运行集成验收；测试入口会拒绝版本不匹配的宿主：
 
