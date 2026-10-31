@@ -27,7 +27,7 @@ export const compatibilityRpc: TypertRemoteContribution = {
     }],
     result: {
       mode: 'strict', typeSymbol: 'ai-agent-engine-deepseek#statusResult',
-      create: () => z.strictObject({ engineering: status, roles: status, deletion: status }),
+      create: () => z.strictObject({ engineering: status, roles: status, capability: status, deletion: status }),
     },
   }],
 }

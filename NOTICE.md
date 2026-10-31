@@ -48,3 +48,15 @@ Grok Bot 市场介绍与模板，作为任务分工和协作约定的补充参�
 自动合并或自动部署机制。
 
 本项目不代表 DeepSeek 或 xAI，也不表示获得其官方背书。
+
+## 能力增强 / 破甲（Phase-1）设计参考
+
+一期「能力增强 / 破甲」实现借鉴了下列公开仓库的**产品概念与设置交互**（总开关旁路、可选策略默认关、提示词覆盖与角色表分真源），**未**复制第三方破甲提示词正文、加密提示词库、宿主 Apply/Clean/Drill 实现或公网攻击载荷：
+
+- [YuJunZhiXue/dsh-purge](https://github.com/YuJunZhiXue/dsh-purge)（Apache-2.0）：概念对照与反例（本插件**不做**宿主包补丁 / Apply）。按 Apache-2.0 署名要求致谢。
+- [L-Shy-P/dsh-preset-manager](https://github.com/L-Shy-P/dsh-preset-manager)（MIT）：设置「总开关 + 开启后展开编辑」交互。
+- [GTC2080/dsh-APEX_Plugin](https://github.com/GTC2080/dsh-APEX_Plugin)（MIT）：可选任务增强默认关、可控协作/验证指引思路；**未**移植独立 APEX 模式、Teams 大改或浏览器验证套件（该仓已封存于 Harness 0.2.0-rc.2）。
+- [kejixiaoliang/awesome-dsh-plugins](https://github.com/kejixiaoliang/awesome-dsh-plugins)：仅作生态目录索引，无代码合并。
+- [Xilin3/dsh-prompt-persona](https://github.com/Xilin3/dsh-prompt-persona)（MIT）：关闭=旁路、覆盖层与其他 scope 隔离的交互参考。
+
+本插件破甲路径仅为 `$DSH_HOME/ai-agent-engine/prompt-override.md`（或 `jailbreakPromptPath`）经 `systemPrompt.section` 注入；与 `roles.json` 分真源。

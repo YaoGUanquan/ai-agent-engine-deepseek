@@ -21,6 +21,8 @@ import { installTeamPresentation } from './team-presentation.tsx'
 import { pluginRpc } from './rpc.ts'
 import { RolesSettingsPage } from './roles-settings.tsx'
 import type { RolesRemote } from './roles-contract.ts'
+import { CapabilitySettingsPage } from './capability-settings.tsx'
+import type { CapabilityRemote } from './capability-contract.ts'
 import { attachRowContextMenu } from './row-context-menu.ts'
 import { initialModuleStatuses, mountModule } from './module-runtime.ts'
 import { CompatibilitySettingsPage } from './compatibility-settings.tsx'
@@ -126,7 +128,13 @@ export async function apply(ctx: Context): Promise<void> {
   mountModule(ctx, 'roles', ['slots', 'locale', 'remote'], {
     slots: ['inject', 'register'], locale: ['bind', 'subscribe'],
   }, statuses, async scope => { mountRoles(scope) })
+
+  mountModule(ctx, 'capability', ['slots', 'locale', 'remote', 'configForms'], {
+    slots: ['inject', 'register'], locale: ['bind', 'subscribe'],
+    configForms: ['describe', 'get'],
+  }, statuses, async scope => { mountCapability(scope) })
 }
+
 
 function mountDeletion(ctx: Context): void {
   const settings = ctx.configForms.describe()
@@ -179,6 +187,35 @@ function mountRoles(ctx: Context): void {
       dispose = registerRolesSection()
     }
     // Locale changes update dictionary; re-register so the nav label refreshes.
+    const unsubscribe = ctx.locale.subscribe(refresh)
+    return () => { unsubscribe(); dispose() }
+  })
+}
+
+function mountCapability(ctx: Context): void {
+  const capabilityRemote = ctx.get('remote.aeCapability') as CapabilityRemote | undefined
+  if (!capabilityRemote) throw new Error('AI Agent Engine capability API namespace was not mounted')
+  const configForm = ctx.configForms.get<{
+    capabilityEnhanceEnabled?: boolean
+    jailbreakEnabled?: boolean
+    enhanceProfile?: string
+    jailbreakPrompt?: string
+  }>('ai-agent-engine')
+  const translate = ctx.locale.bind('ai-agent-engine')
+  const registerSection = () => ctx.slots.register({
+    name: 'settings.section',
+    id: 'ai-agent-engine-capability',
+    order: 419,
+    label: translate('capability.section'),
+    locale: 'ai-agent-engine',
+    inject: () => ({ capability: capabilityRemote, configForm }),
+  }, CapabilitySettingsPage)
+  ctx.slots.inject('settings.section', () => {
+    let dispose = registerSection()
+    const refresh = () => {
+      dispose()
+      dispose = registerSection()
+    }
     const unsubscribe = ctx.locale.subscribe(refresh)
     return () => { unsubscribe(); dispose() }
   })
