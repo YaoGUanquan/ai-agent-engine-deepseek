@@ -24,7 +24,7 @@ export declare class CapabilityPolicyService extends TypertRemoteService {
         capabilityEnhanceEnabled: () => boolean;
         jailbreakEnabled: () => boolean;
         jailbreakPromptPath: string;
-        enhanceProfile: string;
+        enhanceProfile: () => string;
     });
     private authorize;
     private resolvePath;

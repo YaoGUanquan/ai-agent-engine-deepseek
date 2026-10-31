@@ -3,11 +3,12 @@ import z from '@deepseek-ai/schemastery';
 import type { Config as PluginConfig } from './types.ts';
 export declare const name = "ai-agent-engine";
 export declare const inject: string[];
-export interface Config extends Omit<PluginConfig, 'conversationManagement' | 'rolesEnabled' | 'capabilityEnhanceEnabled' | 'jailbreakEnabled'> {
+export interface Config extends Omit<PluginConfig, 'conversationManagement' | 'rolesEnabled' | 'capabilityEnhanceEnabled' | 'jailbreakEnabled' | 'enhanceProfile'> {
     conversationManagement: Volatile<boolean>;
     rolesEnabled: Volatile<boolean>;
     capabilityEnhanceEnabled: Volatile<boolean>;
     jailbreakEnabled: Volatile<boolean>;
+    enhanceProfile: Volatile<string>;
 }
 export declare const Config: z<Schemastery.ObjectS<NoInfer<{
     engineering: z<boolean, boolean, "defined">;
@@ -17,7 +18,7 @@ export declare const Config: z<Schemastery.ObjectS<NoInfer<{
     rolesPath: z<string, string, "defined">;
     capabilityEnhanceEnabled: z<boolean, boolean, "volatile-defined">;
     jailbreakEnabled: z<boolean, boolean, "volatile-defined">;
-    enhanceProfile: z<string, string, "defined">;
+    enhanceProfile: z<string, string, "volatile-defined">;
     jailbreakPromptPath: z<string, string, "defined">;
     jailbreakPrompt: z<string, string, "defined">;
 }>>, Schemastery.ObjectT<NoInfer<{
@@ -28,7 +29,7 @@ export declare const Config: z<Schemastery.ObjectS<NoInfer<{
     rolesPath: z<string, string, "defined">;
     capabilityEnhanceEnabled: z<boolean, boolean, "volatile-defined">;
     jailbreakEnabled: z<boolean, boolean, "volatile-defined">;
-    enhanceProfile: z<string, string, "defined">;
+    enhanceProfile: z<string, string, "volatile-defined">;
     jailbreakPromptPath: z<string, string, "defined">;
     jailbreakPrompt: z<string, string, "defined">;
 }>>, "plain">;

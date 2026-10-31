@@ -22,7 +22,8 @@ export interface EngineeringConfig {
   rolesPath?: string
   capabilityEnhanceEnabled?: boolean | (() => boolean)
   jailbreakEnabled?: boolean | (() => boolean)
-  enhanceProfile?: string
+  /** String snapshot or live getter from Host volatile Config. */
+  enhanceProfile?: string | (() => string)
   jailbreakPromptPath?: string
   jailbreakPrompt?: string
 }
@@ -34,7 +35,7 @@ export const Config = z.object({
   rolesPath: z.string().default(''),
   capabilityEnhanceEnabled: z.any().default(false),
   jailbreakEnabled: z.any().default(false),
-  enhanceProfile: z.string().default(''),
+  enhanceProfile: z.any().default(''),
   jailbreakPromptPath: z.string().default(''),
   jailbreakPrompt: z.string().default(''),
 })
@@ -42,6 +43,12 @@ export const Config = z.object({
 function flagOf(value: boolean | (() => boolean) | undefined, fallback = false): boolean {
   if (typeof value === 'function') return value()
   if (typeof value === 'boolean') return value
+  return fallback
+}
+
+function textOf(value: string | (() => string) | undefined, fallback = ''): string {
+  if (typeof value === 'function') return value()
+  if (typeof value === 'string') return value
   return fallback
 }
 
@@ -78,7 +85,7 @@ export async function buildCapabilitySections(
   const resolved = await resolveCapabilityPolicySections({
     capabilityEnhanceEnabled: flagOf(config.capabilityEnhanceEnabled, false),
     jailbreakEnabled: flagOf(config.jailbreakEnabled, false),
-    enhanceProfile: config.enhanceProfile,
+    enhanceProfile: textOf(config.enhanceProfile),
     jailbreakPromptPath: config.jailbreakPromptPath,
     jailbreakPrompt: config.jailbreakPrompt,
     warn,

@@ -15,8 +15,8 @@ export interface Config {
   /** Jailbreak prompt-override master switch (default off). */
   jailbreakEnabled: boolean
   /**
-   * Optional enhance profile id. Empty / `default` → builtin text.
-   * Unknown values are isolated (enhance skipped).
+   * Optional enhance profile id (volatile on Host Config). Empty / `default` → builtin text.
+   * Unknown values are isolated (enhance skipped). Settings save refreshes inject live.
    */
   enhanceProfile: string
   /**

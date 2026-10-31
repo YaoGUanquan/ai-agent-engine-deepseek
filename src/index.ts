@@ -10,11 +10,12 @@ import { initialModuleStatuses, mountModule } from './module-runtime.ts'
 export const name = 'ai-agent-engine'
 export const inject = ['typert']
 
-export interface Config extends Omit<PluginConfig, 'conversationManagement' | 'rolesEnabled' | 'capabilityEnhanceEnabled' | 'jailbreakEnabled'> {
+export interface Config extends Omit<PluginConfig, 'conversationManagement' | 'rolesEnabled' | 'capabilityEnhanceEnabled' | 'jailbreakEnabled' | 'enhanceProfile'> {
   conversationManagement: Volatile<boolean>
   rolesEnabled: Volatile<boolean>
   capabilityEnhanceEnabled: Volatile<boolean>
   jailbreakEnabled: Volatile<boolean>
+  enhanceProfile: Volatile<string>
 }
 
 export const Config = z.object({
@@ -25,7 +26,7 @@ export const Config = z.object({
   rolesPath: z.string().default(''),
   capabilityEnhanceEnabled: z.boolean().default(false).volatile(),
   jailbreakEnabled: z.boolean().default(false).volatile(),
-  enhanceProfile: z.string().default(''),
+  enhanceProfile: z.string().default('').volatile(),
   jailbreakPromptPath: z.string().default(''),
   jailbreakPrompt: z.string().default(''),
 })
@@ -51,7 +52,7 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
       capabilityEnhanceEnabled: () => config.capabilityEnhanceEnabled.get(),
       jailbreakEnabled: () => config.jailbreakEnabled.get(),
       jailbreakPromptPath: config.jailbreakPromptPath,
-      enhanceProfile: config.enhanceProfile,
+      enhanceProfile: () => config.enhanceProfile.get(),
     })
   })
   mountModule(ctx, 'deletion', [
@@ -110,7 +111,7 @@ async function installEngineering(ctx: Context, config: Config, statuses: import
       rolesPath: config.rolesPath,
       capabilityEnhanceEnabled: () => config.capabilityEnhanceEnabled.get(),
       jailbreakEnabled: () => config.jailbreakEnabled.get(),
-      enhanceProfile: config.enhanceProfile,
+      enhanceProfile: () => config.enhanceProfile.get(),
       jailbreakPromptPath: config.jailbreakPromptPath,
       jailbreakPrompt: config.jailbreakPrompt,
     })

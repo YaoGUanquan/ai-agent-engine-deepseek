@@ -93,3 +93,23 @@ describe('resolveCapabilityPolicySections', () => {
     expect(result.overrideText).toBe('inline-text')
   })
 })
+
+describe('buildCapabilitySections enhanceProfile getter', () => {
+  it('reads live enhanceProfile from a getter (volatile wiring)', async () => {
+    const { buildCapabilitySections } = await import('../src/engineering.ts')
+    let profile = 'default'
+    const sections = await buildCapabilitySections({
+      capabilityEnhanceEnabled: true,
+      jailbreakEnabled: false,
+      enhanceProfile: () => profile,
+    })
+    expect(sections.enhance).toContain('Capability selection')
+    profile = 'nope'
+    const isolated = await buildCapabilitySections({
+      capabilityEnhanceEnabled: true,
+      jailbreakEnabled: false,
+      enhanceProfile: () => profile,
+    })
+    expect(isolated.enhance).toBeUndefined()
+  })
+})

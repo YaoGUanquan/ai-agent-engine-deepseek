@@ -314,7 +314,7 @@ node tools/harness-integration.mjs "<official-harness-source-directory>"
 | `rolesPath` | 空 | 可选绝对路径；空则使用 `$DSH_HOME/ai-agent-engine/roles.json` |
 | `capabilityEnhanceEnabled` | `false` | 是否启用模型能力增强（插件内策略段；关=全旁路） |
 | `jailbreakEnabled` | `false` | 是否启用破甲提示词覆盖层（关=不注入） |
-| `enhanceProfile` | 空 | 增强方案；一期接受空或 `default`，非法值隔离 |
+| `enhanceProfile` | 空 | 增强方案（**volatile**）；一期接受空或 `default`，非法值隔离；设置页保存后即时刷新注入 |
 | `jailbreakPromptPath` | 空 | 可选覆盖文件绝对路径；空则 `$DSH_HOME/ai-agent-engine/prompt-override.md` |
 | `jailbreakPrompt` | 空 | 可选内联短文本；设置页长文以覆盖文件为准，通常保持为空 |
 

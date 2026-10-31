@@ -48,7 +48,7 @@ export class CapabilityPolicyService extends TypertRemoteService {
       capabilityEnhanceEnabled: () => boolean
       jailbreakEnabled: () => boolean
       jailbreakPromptPath: string
-      enhanceProfile: string
+      enhanceProfile: () => string
     },
   ) {
     super(ctx, 'aeCapability')
@@ -86,7 +86,7 @@ export class CapabilityPolicyService extends TypertRemoteService {
     return {
       capabilityEnhanceEnabled: this.config.capabilityEnhanceEnabled(),
       jailbreakEnabled: this.config.jailbreakEnabled(),
-      enhanceProfile: this.config.enhanceProfile,
+      enhanceProfile: this.config.enhanceProfile(),
       jailbreakPromptPath: path,
       overrideExists,
       overridePath: path,

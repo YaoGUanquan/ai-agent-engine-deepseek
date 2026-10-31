@@ -9,7 +9,8 @@ export interface EngineeringConfig {
     rolesPath?: string;
     capabilityEnhanceEnabled?: boolean | (() => boolean);
     jailbreakEnabled?: boolean | (() => boolean);
-    enhanceProfile?: string;
+    /** String snapshot or live getter from Host volatile Config. */
+    enhanceProfile?: string | (() => string);
     jailbreakPromptPath?: string;
     jailbreakPrompt?: string;
 }
@@ -20,7 +21,7 @@ export declare const Config: z<Schemastery.ObjectS<NoInfer<{
     rolesPath: z<string, string, "defined">;
     capabilityEnhanceEnabled: z<any, any, "defined">;
     jailbreakEnabled: z<any, any, "defined">;
-    enhanceProfile: z<string, string, "defined">;
+    enhanceProfile: z<any, any, "defined">;
     jailbreakPromptPath: z<string, string, "defined">;
     jailbreakPrompt: z<string, string, "defined">;
 }>>, Schemastery.ObjectT<NoInfer<{
@@ -29,7 +30,7 @@ export declare const Config: z<Schemastery.ObjectS<NoInfer<{
     rolesPath: z<string, string, "defined">;
     capabilityEnhanceEnabled: z<any, any, "defined">;
     jailbreakEnabled: z<any, any, "defined">;
-    enhanceProfile: z<string, string, "defined">;
+    enhanceProfile: z<any, any, "defined">;
     jailbreakPromptPath: z<string, string, "defined">;
     jailbreakPrompt: z<string, string, "defined">;
 }>>, "plain">;
