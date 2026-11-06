@@ -21,6 +21,7 @@ export const Config = z.object({
   maxMembers: z.natural().min(1).default(8),
   rolesEnabled: z.boolean().default(true).volatile(),
   rolesPath: z.string().default(''),
+  updateFeed: z.string().default(''),
 })
 
 /** Install an optional native preset without changing the selected default. */
@@ -31,6 +32,14 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
   })
   const statuses = initialModuleStatuses()
   await ctx.plugin(CompatibilityService, { statuses })
+  mountModule(ctx, 'update', ['typert'], {}, statuses, async scope => {
+    const { UpdateService } = await import('./update-service.ts')
+    await scope.plugin(UpdateService, {
+      pluginName: 'ai-agent-engine-deepseek',
+      feed: config.updateFeed,
+      repository: 'YaoGUanquan/ai-agent-engine-deepseek',
+    })
+  })
   mountModule(ctx, 'roles', ['typert'], {}, statuses, async scope => {
     const { RoleCatalogService } = await import('./roles-service.ts')
     await scope.plugin(RoleCatalogService, {

@@ -10,4 +10,9 @@ export interface Config {
      * Not workspace `.ai-agent-engine/` (that path remains deletion journals only).
      */
     rolesPath: string;
+    /**
+     * Release feed the settings update button reads. Empty uses the official
+     * GitHub release channel; a `file:` URL reads a local document for mirrors.
+     */
+    updateFeed: string;
 }

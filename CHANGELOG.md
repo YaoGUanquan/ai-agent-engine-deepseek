@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.5 - 2026-11-06
+
+- 设置页新增 `settings.section`「插件更新」：显示已安装版本、发布版本、Harness 版本与兼容状态，提供「检查更新」「立即更新」两个按钮。
+- 更新由宿主 `pluginManager` 执行：下载 Release 的 `.tgz` 并用 `SHA256SUMS.txt` 校验后就地安装，无需先卸载；失败时报告原因且不改动已有安装，成功后提示重启 Desktop。
+- `link:`／本地 git 检出安装走另一条通道：`git fetch` + `merge --ff-only`，`package.json`/lock 变化时补装依赖并重建，有本地改动时拒绝执行。
+- 加载门禁改为只声明下限 `engines.dsh: ">=0.2.1-rc.5"`：Harness 升到 `0.2.2`、`1.0` 等更高版本时不再被判不兼容而拒绝加载。
+- 新增 `dsh.compatibility.verifiedThrough: "0.2.1-rc.5"`：超出实测基线只在设置页标注「未经实测」，不阻止加载；运行依赖与 peer 仍固定在 `>=0.2.1-rc.5 <0.2.2-0`。
+- 新增 `aeUpdate` host RPC（`getState` / `check` / `apply`）与 `update` 模块状态行，模块与能力表同步扩展。
+- 新增配置项 `updateFeed`：留空走官方 GitHub Release 渠道，可填镜像或 `file:` 本地文档。
+
 ## 0.2.4 - 2026-10-30
 
 - Harness 兼容范围改为 `>=0.2.1-rc.5 <0.2.2-0`，自动放行同系列后续 RC 与 `0.2.1` 正式版；开发依赖仍固定 rc.5。

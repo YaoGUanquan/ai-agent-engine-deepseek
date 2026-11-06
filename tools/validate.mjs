@@ -13,16 +13,19 @@ assert.equal(pkg.version, lock.version)
 assert.equal(pkg.version, lock.packages[''].version)
 assert.ok(readFileSync('README.md', 'utf8').includes(`github:YaoGUanquan/ai-agent-engine-deepseek#v${pkg.version}`))
 assert.ok(readFileSync('CHANGELOG.md', 'utf8').includes(`## ${pkg.version} -`))
-assert.equal(pkg.engines.dsh, '>=0.2.1-rc.5 <0.2.2-0')
+assert.equal(pkg.engines.dsh, '>=0.2.1-rc.5')
 assert.deepEqual(lock.packages[''].engines, pkg.engines)
 assert.deepEqual(lock.packages[''].peerDependencies, pkg.peerDependencies)
+// The load gate is `engines.dsh` alone; peers and runtime dependencies keep the tested window.
+const testedDshRange = '>=0.2.1-rc.5 <0.2.2-0'
 for (const [name, range] of Object.entries(pkg.peerDependencies)) {
-  if (name.startsWith('@deepseek-ai/dsh-')) assert.equal(range, pkg.engines.dsh)
+  if (name.startsWith('@deepseek-ai/dsh-')) assert.equal(range, testedDshRange)
 }
+assert.ok(semver.satisfies(pkg.dsh.compatibility.verifiedThrough, testedDshRange, { includePrerelease: true }))
 assert.deepEqual(lock.packages[''].dependencies, pkg.dependencies)
 for (const [name, range] of Object.entries(pkg.dependencies)) {
   if (name.startsWith('@deepseek-ai/dsh-')) {
-    assert.equal(range, pkg.engines.dsh)
+    assert.equal(range, testedDshRange)
     assert.ok(semver.satisfies(lock.packages[`node_modules/${name}`].version, range))
   }
 }

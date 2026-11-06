@@ -1,6 +1,6 @@
 {
   "name": "ai-agent-engine-deepseek",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "description": "Engineering teams and conversation management for DeepSeek Harness.",
   "type": "module",
   "license": "GPL-2.0-only",
@@ -34,10 +34,13 @@
   ],
   "engines": {
     "node": ">=24",
-    "dsh": ">=0.2.1-rc.5 <0.2.2-0"
+    "dsh": ">=0.2.1-rc.5"
   },
   "dsh": {
     "manifestVersion": 1,
+    "compatibility": {
+      "verifiedThrough": "0.2.1-rc.5"
+    },
     "bundle": {
       "patch": "./cordis.patch.yml"
     },

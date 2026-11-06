@@ -13,12 +13,14 @@ export declare const Config: z<Schemastery.ObjectS<NoInfer<{
     maxMembers: z<number, number, "defined">;
     rolesEnabled: z<boolean, boolean, "volatile-defined">;
     rolesPath: z<string, string, "defined">;
+    updateFeed: z<string, string, "defined">;
 }>>, Schemastery.ObjectT<NoInfer<{
     engineering: z<boolean, boolean, "defined">;
     conversationManagement: z<boolean, boolean, "volatile-defined">;
     maxMembers: z<number, number, "defined">;
     rolesEnabled: z<boolean, boolean, "volatile-defined">;
     rolesPath: z<string, string, "defined">;
+    updateFeed: z<string, string, "defined">;
 }>>, "plain">;
 /** Install an optional native preset without changing the selected default. */
 export declare function apply(ctx: Context, config: Config): Promise<void>;

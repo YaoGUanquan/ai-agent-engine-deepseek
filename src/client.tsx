@@ -24,6 +24,8 @@ import type { RolesRemote } from './roles-contract.ts'
 import { attachRowContextMenu } from './row-context-menu.ts'
 import { initialModuleStatuses, mountModule } from './module-runtime.ts'
 import { CompatibilitySettingsPage } from './compatibility-settings.tsx'
+import { UpdateSettingsPage } from './update-settings.tsx'
+import type { UpdateRemote } from './update-contract.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap { 'ai-agent-engine': LocaleKey }
@@ -100,6 +102,16 @@ export async function apply(ctx: Context): Promise<void> {
     label: translate('compatibility.section'), locale: 'ai-agent-engine',
     inject: () => ({ remote: ctx.get('remote.aeCompatibility'), clientStatuses: statuses }),
   }, CompatibilitySettingsPage))
+  const updateRemote = ctx.get('remote.aeUpdate') as UpdateRemote | undefined
+  if (updateRemote !== undefined) {
+    // The update section only exists when the Host mounted its namespace.
+    statuses.update = { state: 'ready' }
+    ctx.slots.inject('settings.section', () => ctx.slots.register({
+      name: 'settings.section', id: 'ai-agent-engine-update', order: 422,
+      label: translate('update.section'), locale: 'ai-agent-engine',
+      inject: () => ({ remote: updateRemote }),
+    }, UpdateSettingsPage))
+  }
   mountModule(ctx, 'engineering', ['slots', 'locale', 'sessions', 'uiWorkspace', 'loader'], {
     slots: ['inject', 'register', 'entries', 'subscribe'], locale: ['bind', 'getSnapshot'],
     sessions: ['binding', 'retainInfo'], uiWorkspace: ['openSession'],
