@@ -16,16 +16,19 @@ assert.ok(readFileSync('CHANGELOG.md', 'utf8').includes(`## ${pkg.version} -`))
 assert.equal(pkg.engines.dsh, '>=0.2.1-rc.5')
 assert.deepEqual(lock.packages[''].engines, pkg.engines)
 assert.deepEqual(lock.packages[''].peerDependencies, pkg.peerDependencies)
-// The load gate is `engines.dsh` alone; peers and runtime dependencies keep the tested window.
-const testedDshRange = '>=0.2.1-rc.5 <0.2.2-0'
+// Host verification metadata is separate from the rc.5 library dependency window.
+const dependencyDshRange = '>=0.2.1-rc.5 <0.2.2-0'
 for (const [name, range] of Object.entries(pkg.peerDependencies)) {
-  if (name.startsWith('@deepseek-ai/dsh-')) assert.equal(range, testedDshRange)
+  if (name.startsWith('@deepseek-ai/dsh-')) assert.equal(range, dependencyDshRange)
 }
-assert.ok(semver.satisfies(pkg.dsh.compatibility.verifiedThrough, testedDshRange, { includePrerelease: true }))
+const verifiedRuntimes = ['0.2.1-rc.5', '0.2.2-rc.1']
+assert.deepEqual(pkg.dsh.compatibility.verifiedRuntimes, verifiedRuntimes)
+assert.equal(pkg.dsh.compatibility.verifiedThrough, verifiedRuntimes.at(-1))
+for (const runtime of verifiedRuntimes) assert.ok(semver.satisfies(runtime, pkg.engines.dsh, { includePrerelease: true }))
 assert.deepEqual(lock.packages[''].dependencies, pkg.dependencies)
 for (const [name, range] of Object.entries(pkg.dependencies)) {
   if (name.startsWith('@deepseek-ai/dsh-')) {
-    assert.equal(range, testedDshRange)
+    assert.equal(range, dependencyDshRange)
     assert.ok(semver.satisfies(lock.packages[`node_modules/${name}`].version, range))
   }
 }

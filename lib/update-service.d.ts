@@ -17,9 +17,9 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
  *
  * It never edits Harness or another plugin. Two channels are supported: a
  * package install (download the release tarball, then let the Host plugin
- * manager install it) and a git checkout (fetch and `--ff-only` merge the
- * upstream, then rebuild). Both end with a restart notice because Host code is
- * loaded at composition time.
+ * manager install it) and a git checkout (build an isolated pinned target,
+ * fast-forward, then activate whole output/dependency trees). Package installs
+ * follow the Host lifecycle; checkout updates require a restart.
  */
 export declare class UpdateService extends TypertRemoteService {
     private readonly config;
@@ -34,6 +34,11 @@ export declare class UpdateService extends TypertRemoteService {
     private restartRequired;
     private blocked;
     private busy;
+    private installResult;
+    private pendingCheckout;
+    private pendingDirectory;
+    private pendingLoaded;
+    private pendingLoad;
     constructor(ctx: Context, config: {
         pluginName: string;
         feed: string;
@@ -53,6 +58,7 @@ export declare class UpdateService extends TypertRemoteService {
     private installSpec;
     private channel;
     private checkoutRoot;
+    private assertCheckoutIdentity;
     private cacheRoot;
     private outdated;
     private view;
@@ -67,7 +73,16 @@ export declare class UpdateService extends TypertRemoteService {
     private download;
     private checkCheckout;
     private upstream;
+    /** Share one read so a concurrent getState cannot overwrite an update in progress. */
+    private loadPendingCheckout;
+    /** Located inside Git metadata, including worktree-private and relative git-paths. */
+    private readPendingCheckout;
+    private savePendingCheckout;
+    private checkoutPaths;
+    private assertCheckoutUnchanged;
     private runCheckout;
+    /** Swap whole dependency/output trees; backups retain every preexisting file. */
+    private activateCheckout;
     private git;
     private exec;
 }

@@ -58,6 +58,12 @@ function sessionDirectory(root: string, header: SessionHeader): string {
   return join(root, project, encodeSegment(header.id))
 }
 
+// Only subagent lineage belongs to the parent's deletion family. An independent
+// fork also retains parentSession, but owns its own history and lifecycle.
+function ownedParent(header: Pick<SessionHeader, 'origin' | 'parentSession'> | undefined): SessionId | undefined {
+  return header?.origin === 'subagent' ? header.parentSession : undefined
+}
+
 function fingerprint(headers: readonly SessionHeader[]): string {
   return createHash('sha256').update(JSON.stringify(headers.map(header =>
     [header.id, header.createdAt, header.cwd, header.parentSession, header.origin]))).digest('hex')
@@ -83,7 +89,8 @@ function isValidDeletionRecord(record: DeletionRecord, filename: string): boolea
 
 /**
  * Read one deletion journal. Corrupt or invalid files are renamed with a
- * `.corrupt` suffix and skipped so plugin init can continue.
+ * `.corrupt` suffix and skipped so plugin init can continue. Read failures are
+ * preserved and rethrown: an unavailable journal must remain recoverable.
  */
 export async function loadDeletionJournalFile(
   directory: string,
@@ -92,8 +99,13 @@ export async function loadDeletionJournalFile(
 ): Promise<DeletionRecord | undefined> {
   if (!/^[a-f0-9]{64}\.json$/.test(filename)) return undefined
   const path = join(directory, filename)
+  let text: string
+  try { text = await readFile(path, 'utf8') } catch (error) {
+    log('Failed to read conversation deletion journal %s; preserving it for recovery (%s)', filename, error)
+    throw error
+  }
   try {
-    const record = JSON.parse(await readFile(path, 'utf8')) as DeletionRecord
+    const record = JSON.parse(text) as DeletionRecord
     if (!isValidDeletionRecord(record, filename)) throw new Error('Invalid conversation deletion record')
     return record
   } catch (error) {
@@ -160,17 +172,19 @@ export class ConversationDeletion extends TypertRemoteService {
     this.root = resolve(persistence.config!.root!)
     this.directory = join(this.root, '.ai-agent-engine', 'deletions')
     await mkdir(this.directory, { recursive: true, mode: 0o700 })
-    const remember = async (operation: Promise<AgentHandle>, id: SessionId, parent?: SessionId): Promise<AgentHandle> => {
-      this.inflight.set(operation, { id, parent })
-      try {
-        const handle = await operation
-        if (this.blocked(handle.agent.id) || this.blocked(handle.agent.session.header.parentSession)) {
+    const remember = (operation: Promise<AgentHandle>, id: SessionId, parent?: SessionId): Promise<AgentHandle> => {
+      const remembered = operation.then(async handle => {
+        if (this.blocked(handle.agent.id) || this.blocked(parent) || this.blocked(ownedParent(handle.agent.session.header))) {
           await handle.dispose()
           reject('This conversation is being deleted')
         }
         this.handles.set(handle.agent.id, handle)
         return handle
-      } finally { this.inflight.delete(operation) }
+      }).finally(() => { this.inflight.delete(remembered) })
+      // Drain the whole adapter, including disposal of a handle rejected after
+      // its factory resolves, before validating or committing a deletion.
+      this.inflight.set(remembered, { id, parent })
+      return remembered
     }
     const owner = this
     const restore: (() => void)[] = []
@@ -182,16 +196,16 @@ export class ConversationDeletion extends TypertRemoteService {
       for (const dispose of restore.reverse()) dispose()
     }, 'ai-agent-engine.deletionDrain()')
     restore.push(wrapMethod(ctx.agents, 'create', original => async function (this: typeof ctx.agents, options: CreateAgentOptions) {
-      const parent = options.meta?.parentSession ?? options.parentAgent?.id
+      const parent = ownedParent(options.meta) ?? options.parentAgent?.id
       owner.assertWritable(options.sessionId, parent)
       return remember(original.call(this, options), options.sessionId, parent)
     }))
     restore.push(wrapMethod(ctx.agents, 'resume', original => async function (this: typeof ctx.agents, options: ResumeAgentOptions) {
-      owner.assertWritable(options.resumeSessionId)
+      owner.assertWritable(options.resumeSessionId, options.parentAgent?.id)
       return remember(original.call(this, options), options.resumeSessionId, options.parentAgent?.id)
     }))
     restore.push(wrapMethod(persistence, 'create', original => async function (this: SessionPersistence, header, options) {
-      owner.assertWritable(header.id, header.parentSession)
+      owner.assertWritable(header.id, ownedParent(header))
       return original.call(this, header, options)
     }))
     const rawPersistence = persistence
@@ -211,16 +225,22 @@ export class ConversationDeletion extends TypertRemoteService {
     restore.push(wrapMethod(persistence, 'list', original => async function (this: SessionPersistence, options) {
       return (await original.call(this, options)).filter(row => !owner.deleted.has(row.header.id))
     }))
-    ctx.on('session/created', session => { this.assertWritable(session.id, session.header.parentSession) })
+    ctx.on('session/created', session => { this.assertWritable(session.id, ownedParent(session.header)) })
     ctx.on('agent/disposed', ({ agent }) => { this.handles.delete(agent.id) })
     const cache = ctx.storageDomain.get('session_projcache')?.table('sessions')
     if (cache) restore.push(wrapMethod(cache, 'put', original => function (this: typeof cache, id, value) {
       return owner.blocked(id as SessionId) ? Promise.resolve() : original.call(this, id, value)
     }))
     for (const filename of await readdir(this.directory)) {
-      const record = await loadDeletionJournalFile(this.directory, filename, (format, ...args) => {
-        ctx.logger.warn(format, ...args)
-      })
+      let record: DeletionRecord | undefined
+      try {
+        record = await loadDeletionJournalFile(this.directory, filename, (format, ...args) => {
+          ctx.logger.warn(format, ...args)
+        })
+      } catch (error) {
+        this.config.onUnsupported?.()
+        throw error
+      }
       if (!record) continue
       for (const header of record.headers) this.deleted.add(header.id)
       if (!record.complete) {
@@ -311,9 +331,11 @@ export class ConversationDeletion extends TypertRemoteService {
     try {
       const committed = request.sessionIds.every(id => this.deleted.has(id))
       if (!committed) {
-        if (fingerprint(await this.collect(request.sessionId)) !== record.fingerprint) reject('Conversation family changed', 'ae-conversations/delete-scope-changed')
         await Promise.allSettled([...this.inflight].filter(([, item]) =>
           this.pending.has(item.id) || (item.parent !== undefined && this.pending.has(item.parent))).map(([operation]) => operation))
+        // A creation admitted before pending may have materialized durable
+        // history while draining, even if its live handle was then rejected.
+        if (fingerprint(await this.collect(request.sessionId)) !== record.fingerprint) reject('Conversation family changed', 'ae-conversations/delete-scope-changed')
         for (const id of request.sessionIds) {
           const agent = this.ctx.agents.get(id)
           if (agent && this.handles.get(id)?.agent !== agent) {

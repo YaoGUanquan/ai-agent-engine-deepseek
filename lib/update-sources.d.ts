@@ -37,13 +37,22 @@ export interface FeedOptions {
     readonly feed?: string;
     readonly timeoutMs?: number;
     readonly userAgent?: string;
+    /** The package whose exact versioned release asset may be installed. */
+    readonly pluginName?: string;
     /** Injection seam for tests and proxies. */
     readonly fetchImpl?: typeof fetch;
 }
+/** npm pack's filename for an exact package identity (including scoped names). */
+export declare function releaseAssetName(pluginName: string, version: string): string;
 /** Normalize a GitHub release document, or a hand-written `{ version, assets }` one. */
-export declare function normalizeRelease(payload: unknown): ReleaseView;
+export declare function normalizeRelease(payload: unknown, pluginName?: string): ReleaseView;
 /** Read the latest published release from the configured feed. */
 export declare function fetchLatestRelease(options?: FeedOptions): Promise<ReleaseView>;
-/** Extract the checksum line for one asset from a `SHA256SUMS` document. */
+/** An exact, unambiguous named SHA256SUMS entry; unrelated/bare digests never authorize an asset. */
 export declare function parseChecksum(document: string, fileName: string): string | undefined;
+/** Read the manifest without extracting files or executing package code. */
+export declare function readPackageIdentity(path: string): Promise<{
+    name: string;
+    version: string;
+}>;
 export declare function sha256File(path: string): Promise<string>;

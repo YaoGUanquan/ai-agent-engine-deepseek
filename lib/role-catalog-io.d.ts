@@ -2,7 +2,8 @@
 import { type RoleCatalogOptions, type RoleCatalogResult, type RolesFile } from './role-catalog.ts';
 /** Resolve overlay path: explicit `rolesPath`, else `$DSH_HOME/ai-agent-engine/roles.json`. */
 export declare function resolveRolesFilePath(rolesPath?: string): string | undefined;
-/** Read raw overlay document without merging; missing file returns undefined. */
+/** Read a complete editable overlay. Only ENOENT means missing; other read or
+ * validation errors reject so editing cannot overwrite unreadable saved data. */
 export declare function readOverlayDocument(path: string, warn?: (message: string, ...args: unknown[]) => void): Promise<RolesFile | undefined>;
 /** Persist overlay atomically (temp + rename). Validates before any write. */
 export declare function writeRolesFile(path: string, raw: unknown): Promise<RolesFile>;

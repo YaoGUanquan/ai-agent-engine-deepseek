@@ -36,7 +36,10 @@ export function UpdateSettingsPage({ remote, t }: UpdateSettingsProps) {
   const [busy, setBusy] = useState(false)
   const mounted = useRef(true)
 
-  useEffect(() => () => { mounted.current = false }, [])
+  useEffect(() => {
+    mounted.current = true
+    return () => { mounted.current = false }
+  }, [])
 
   const load = useCallback(async () => {
     if (remote === undefined) return
@@ -104,6 +107,7 @@ export function UpdateSettingsPage({ remote, t }: UpdateSettingsProps) {
   const running = active(state)
   const compat = state?.runtimeSupport ?? 'unknown'
   const blocked = state?.blocked
+  const pendingBuilds = state?.installResult?.pendingBuilds ?? []
   const compatKey = `update.compat${{ verified: 'Verified', 'untested-newer': 'Newer', 'untested-older': 'Older', unknown: 'Unknown' }[compat]}` as LocaleKey
 
   return <div data-ae-update-settings style={{ display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 720 }}>
@@ -138,6 +142,13 @@ export function UpdateSettingsPage({ remote, t }: UpdateSettingsProps) {
     )}
     {running && <p role="status">{t(`update.${phase}` as LocaleKey)}</p>}
     {state?.restartRequired === true && <p role="alert">{t('update.restart')}</p>}
+    {state?.pendingCheckout !== undefined && !running && <p role="status">{t('update.resumePending')}</p>}
+    {pendingBuilds.length > 0 && <p role="alert">
+      {t('update.pendingBuilds')} {pendingBuilds.join(', ')}
+    </p>}
+    {state?.installResult?.warnings?.map((warning, index) => <p key={index} role="status">
+      {t('update.warning')}: {warning}
+    </p>)}
     {blocked !== undefined && blocked !== 'no-update' && (
       <p role="alert">{t(`update.blocked.${blocked}` as LocaleKey)}</p>
     )}

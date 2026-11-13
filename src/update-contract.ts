@@ -15,12 +15,21 @@ export type UpdateBlocked =
   | 'no-release'
   | 'no-asset'
   | 'checksum-mismatch'
+  | 'checksum-missing'
+  | 'checksum-invalid'
+  | 'package-identity-mismatch'
+  | 'install-failed'
+  | 'install-cancelled'
+  | 'install-overridden'
+  | 'checkout-changed'
+  | 'build-failed'
+  | 'activation-failed'
   | 'incompatible-version'
   | 'dirty-worktree'
   | 'no-upstream'
   | 'no-update'
 
-/** How the running Host compares with the range this build was verified against. */
+/** Whether this Host is a recorded runtime check or an untested version. */
 export type RuntimeSupport = 'verified' | 'untested-newer' | 'untested-older' | 'unknown'
 
 export interface UpdateReleaseView {
@@ -32,6 +41,25 @@ export interface UpdateReleaseView {
   readonly assetName?: string
   readonly checksumUrl?: string
   readonly publishedAt?: string
+}
+
+export type CheckoutUpdateStage = 'install' | 'build' | 'merge' | 'activate'
+
+/** Serializable diagnostics from the Host plugin manager; never grants script approval. */
+export interface UpdateInstallResult {
+  readonly changed: boolean
+  readonly application: 'applied' | 'restart-required' | 'overridden' | 'failed' | 'cancelled'
+  readonly error?: { readonly code: string; readonly diagnostic?: string }
+  readonly packageResult?: {
+    readonly exitCode: number
+    readonly output: string
+    readonly truncated: boolean
+    readonly logPath: string
+    readonly kind?: string
+    readonly timedOut?: boolean
+  }
+  readonly warnings?: readonly string[]
+  readonly pendingBuilds?: readonly string[]
 }
 
 export interface UpdateStateView {
@@ -47,6 +75,9 @@ export interface UpdateStateView {
   readonly latest?: UpdateReleaseView
   /** Upstream commits the plugin checkout is behind, for the checkout channel. */
   readonly pendingCommits?: number
+  /** Persisted checkout work, including retries after HEAD already reached target. */
+  readonly pendingCheckout?: { readonly target: string; readonly stage: CheckoutUpdateStage }
+  readonly installResult?: UpdateInstallResult
   readonly outdated: boolean
   readonly canApply: boolean
   readonly blocked?: UpdateBlocked

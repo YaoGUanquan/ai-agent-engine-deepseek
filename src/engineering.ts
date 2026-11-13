@@ -48,10 +48,23 @@ export async function buildEngineeringPolicy(
 /** Install policy in each Standard or engineering Agent's own scope. */
 export async function apply(ctx: Context, config: EngineeringConfig): Promise<void> {
   const warn = (message: string, ...args: unknown[]) => { ctx.logger.warn(message, ...args) }
-  let policy = await buildEngineeringPolicy(config, warn)
-  if (config.teamTools) await ctx.plugin(await import('@deepseek-ai/dsh-experimental-tool-agent-team'))
   const installed = new Map<Agent, () => void>()
+  let disposed = false
+  let generation = 0
+  let initializing = true
+  let policy = ''
+  ctx.on('ai-agent-engine/roles-updated', () => {
+    if (initializing) generation++
+    else refreshPolicy()
+  })
+  ctx.effect(() => () => {
+    disposed = true
+    generation++
+    for (const dispose of installed.values()) dispose()
+    installed.clear()
+  }, 'ai-agent-engine.scopedPolicy()')
   const reconcile = (agent: Agent): void => {
+    if (initializing || disposed) return
     const preset = ctx.agentPresets.composedPreset(agent.ctx)
     const enabled = preset === 'standard' || preset === 'ai-agent-engine'
     if (!enabled) {
@@ -71,7 +84,6 @@ export async function apply(ctx: Context, config: EngineeringConfig): Promise<vo
     }
     for (const agent of ctx.agents.list()) reconcile(agent)
   }
-  for (const agent of ctx.agents.list()) reconcile(agent)
   ctx.on('agent/created', ({ agent }) => { reconcile(agent); return undefined })
   ctx.on('agent-preset/selected', sessionId => {
     const agent = ctx.agents.get(sessionId)
@@ -86,19 +98,28 @@ export async function apply(ctx: Context, config: EngineeringConfig): Promise<vo
     installed.delete(agent)
   })
   const refreshPolicy = (): void => {
+    const current = ++generation
     void (async () => {
       try {
-        policy = await buildEngineeringPolicy(config, warn)
+        const next = await buildEngineeringPolicy(config, warn)
+        if (disposed || current !== generation || next === policy) return
+        policy = next
         reconcileAll()
       } catch (error) {
-        warn('Failed to refresh engineering role policy: %s', error instanceof Error ? error.message : error)
+        if (!disposed && current === generation) {
+          warn('Failed to refresh engineering role policy: %s', error instanceof Error ? error.message : error)
+        }
       }
     })()
   }
-  ctx.on('loader/volatile-update', refreshPolicy)
-  ctx.on('ai-agent-engine/roles-updated', refreshPolicy)
-  ctx.effect(() => () => {
-    for (const dispose of installed.values()) dispose()
-    installed.clear()
-  }, 'ai-agent-engine.scopedPolicy()')
+  if (config.teamTools) await ctx.plugin(await import('@deepseek-ai/dsh-experimental-tool-agent-team'))
+  if (disposed) return
+  let initialGeneration: number
+  do {
+    initialGeneration = generation
+    policy = await buildEngineeringPolicy(config, warn)
+    if (disposed) return
+  } while (initialGeneration !== generation)
+  initializing = false
+  reconcileAll()
 }

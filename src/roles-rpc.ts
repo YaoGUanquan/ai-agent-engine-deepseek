@@ -1,50 +1,50 @@
 import type { InvocationDescriptor, TypertRemoteContribution } from '@deepseek-ai/dsh-typert-protocol'
-import { z } from 'zod'
+import { array as z_array, boolean as z_boolean, literal as z_literal, strictObject as z_strictObject, string as z_string, union as z_union, type ZodType as z_ZodType } from 'zod'
 
 const namespace = 'aeRoles'
-const roleId = z.string().regex(/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/).refine(id => id !== 'lead')
-const overlayEntry = z.strictObject({
+const roleId = z_string().regex(/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/).refine(id => id !== 'lead')
+const overlayEntry = z_strictObject({
   id: roleId,
-  skill: z.string().min(1).optional(),
-  responsibility: z.string().optional(),
+  skill: z_string().min(1).optional(),
+  responsibility: z_string().optional(),
 })
-const putRequest = z.strictObject({
-  version: z.literal(1),
-  roles: z.array(overlayEntry),
+const putRequest = z_strictObject({
+  version: z_literal(1),
+  roles: z_array(overlayEntry),
 })
-const roleDefinition = z.strictObject({
-  id: z.string().min(1),
-  skill: z.string().min(1).optional(),
-  responsibility: z.string().optional(),
+const roleDefinition = z_strictObject({
+  id: z_string().min(1),
+  skill: z_string().min(1).optional(),
+  responsibility: z_string().optional(),
 })
-const catalogResult = z.strictObject({
-  roles: z.array(roleDefinition),
-  source: z.union([z.literal('builtin'), z.literal('merged')]),
-  path: z.string().optional(),
-  enabled: z.boolean(),
+const catalogResult = z_strictObject({
+  roles: z_array(roleDefinition),
+  source: z_union([z_literal('builtin'), z_literal('merged')]),
+  path: z_string().optional(),
+  enabled: z_boolean(),
 })
-const overlayResult = z.strictObject({
-  version: z.literal(1),
-  roles: z.array(overlayEntry),
-  path: z.string().optional(),
-  exists: z.boolean(),
+const overlayResult = z_strictObject({
+  version: z_literal(1),
+  roles: z_array(overlayEntry),
+  path: z_string().optional(),
+  exists: z_boolean(),
 })
-const putResult = z.strictObject({
-  path: z.string().min(1),
-  roles: z.array(roleDefinition),
-  source: z.union([z.literal('builtin'), z.literal('merged')]),
+const putResult = z_strictObject({
+  path: z_string().min(1),
+  roles: z_array(roleDefinition),
+  source: z_union([z_literal('builtin'), z_literal('merged')]),
 })
-const restoreResult = z.strictObject({
-  restored: z.literal(true),
-  path: z.string().optional(),
-  roles: z.array(roleDefinition),
+const restoreResult = z_strictObject({
+  restored: z_literal(true),
+  path: z_string().optional(),
+  roles: z_array(roleDefinition),
 })
 
-function codec(schema: z.ZodType, name: string) {
+function codec(schema: z_ZodType, name: string) {
   return { mode: 'strict' as const, typeSymbol: `ai-agent-engine-deepseek#${name}`, create: () => schema }
 }
 
-const emptyRequest = z.strictObject({})
+const emptyRequest = z_strictObject({})
 
 export const rolesRpc: TypertRemoteContribution = {
   package: 'ai-agent-engine-deepseek',

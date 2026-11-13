@@ -4,16 +4,18 @@ import { spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { runInNewContext } from 'node:vm'
 import { fileURLToPath } from 'node:url'
+import { join } from 'node:path'
 
-await mkdir('lib', { recursive: true })
+const outdir = process.env.AE_BUILD_OUTDIR || 'lib'
+await mkdir(outdir, { recursive: true })
 await build({
-  entryPoints: ['src/index.ts', 'src/engineering.ts'], outdir: 'lib', bundle: true,
+  entryPoints: ['src/index.ts', 'src/engineering.ts'], outdir, bundle: true,
   format: 'esm', platform: 'node', target: 'node24', packages: 'external',
 })
 const pkg = JSON.parse(readFileSync('package.json', 'utf8'))
 const baseline = ['react', 'react-dom', 'react/jsx-runtime', '@deepseek-ai/cordis', '@deepseek-ai/dsh-client-store', '@deepseek-ai/dsh-client-ui-slots', '@deepseek-ai/dsh-client-ui-primitives']
 await build({
-  entryPoints: ['src/client.tsx'], outfile: 'lib/client.js', bundle: true,
+  entryPoints: ['src/client.tsx'], outfile: join(outdir, 'client.js'), bundle: true,
   format: 'cjs', platform: 'browser', target: 'es2022',
   // Preserve bundled string values without multiline trailing whitespace.
   supported: { 'template-literal': false },
@@ -44,6 +46,7 @@ await build({
   footer: { js: 'return module.exports;}});' },
 })
 for (const face of ['host', 'client']) {
-  const result = spawnSync(process.execPath, ['node_modules/typescript/bin/tsc', '--declaration', '--emitDeclarationOnly', '--noEmit', 'false', '--allowImportingTsExtensions', '--outDir', 'lib', '--rootDir', 'src', '-p', `tsconfig.${face}.json`], { stdio: 'inherit' })
+  const result = spawnSync(process.execPath, ['node_modules/typescript/bin/tsc', '--declaration', '--emitDeclarationOnly', '--noEmit', 'false', '--allowImportingTsExtensions', '--outDir', outdir, '--rootDir', 'src', '-p', `tsconfig.${face}.json`], { stdio: 'inherit' })
   if (result.status !== 0) process.exit(result.status ?? 1)
 }
+await import('./check-size.mjs')

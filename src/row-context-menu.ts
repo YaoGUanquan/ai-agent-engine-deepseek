@@ -1,17 +1,22 @@
-/** Bridge the official row's existing action menu without selecting the row. */
+/** Bridge legacy rows; rows with a native menu keep their own gesture handler. */
 export function attachRowContextMenu(marker: HTMLElement, sessionId: string): () => void {
   const row = marker.closest<HTMLElement>('[data-row-key]')
-  const actions = marker.closest('[data-slot="sidebar.workspaces.session.row.action"]')?.parentElement
-    ?? marker.parentElement
+  const slot = marker.closest('[data-slot="sidebar.workspaces.session.row.action"]')
+  const actions = slot?.parentElement ?? marker.parentElement
   if (!row || !actions) return () => {}
+  const nativeMenu = [...row.querySelectorAll('button[data-context-menu-trigger]')]
+    .some(button => !slot?.contains(button))
+  if (nativeMenu) return () => {}
   const open = (event: MouseEvent) => {
-    const trigger = actions.querySelector<HTMLButtonElement>('button')
-    if (!trigger) return
+    // A contribution's own archive/pin buttons are never a menu trigger.
+    const triggers = [...actions.querySelectorAll<HTMLButtonElement>('button')]
+      .filter(button => !slot?.contains(button))
+    if (triggers.length !== 1) return
     event.preventDefault()
     event.stopPropagation()
     const alreadyOpen = [...marker.ownerDocument.querySelectorAll('[data-ae-delete-session]')]
       .some(item => item.getAttribute('data-ae-delete-session') === sessionId)
-    if (!alreadyOpen) trigger.click()
+    if (!alreadyOpen) triggers[0]!.click()
   }
   row.addEventListener('contextmenu', open)
   return () => { row.removeEventListener('contextmenu', open) }

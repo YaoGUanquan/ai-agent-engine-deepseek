@@ -15,19 +15,32 @@ import { MockAdapter, textResponse } from '../../../packages/core/agent-loop/tes
 
 const pluginRoot = process.env.AE_PLUGIN_ROOT
 if (!pluginRoot) throw new Error('Run this integration through tools/harness-integration.mjs')
+const outputRoot = resolve(process.env.AE_HARNESS_OUTPUT_ROOT ?? join(pluginRoot, 'output/playwright'))
 
 describe('AI Agent Engine runtime compatibility', () => {
-  it('admits supported runtimes without exemptions, including the peer fallback', async () => {
+  it('applies the declared engines lower bound without treating admission as runtime verification', async () => {
     const manifest = JSON.parse(await readFile(join(pluginRoot, 'package.json'), 'utf8'))
-    for (const runtime of ['0.2.1-rc.5', '0.2.1-rc.6', '0.2.1-rc.7', '0.2.1']) {
+    for (const runtime of ['0.2.1-rc.5', '0.2.1-rc.6', '0.2.1-rc.7', '0.2.1', '0.2.2-rc.1', '0.2.2', '1.0.0']) {
       expect(evaluatePluginCompatibility(manifest, {}, runtime)).toBeUndefined()
-      const { engines: _engines, ...peerManifest } = manifest
-      expect(evaluatePluginCompatibility(peerManifest, {}, runtime)).toBeUndefined()
     }
-    for (const runtime of ['0.2.1-rc.2', '0.2.1-rc.3', '0.2.1-rc.4', '0.2.2-rc.1', '0.2.2']) {
+    for (const runtime of ['0.2.1-rc.2', '0.2.1-rc.3', '0.2.1-rc.4']) {
       expect(evaluatePluginCompatibility(manifest, {}, runtime)).toMatchObject({
         exempted: false,
         requirements: { 'engines.dsh': manifest.engines.dsh },
+      })
+    }
+  })
+
+  it('keeps the peer fallback within its declared rc.5 compatibility window', async () => {
+    const manifest = JSON.parse(await readFile(join(pluginRoot, 'package.json'), 'utf8'))
+    const { engines: _engines, ...peerManifest } = manifest
+    for (const runtime of ['0.2.1-rc.5', '0.2.1-rc.6', '0.2.1-rc.7', '0.2.1']) {
+      expect(evaluatePluginCompatibility(peerManifest, {}, runtime)).toBeUndefined()
+    }
+    for (const runtime of ['0.2.1-rc.2', '0.2.1-rc.3', '0.2.1-rc.4', '0.2.2-rc.1', '0.2.2', '1.0.0']) {
+      expect(evaluatePluginCompatibility(peerManifest, {}, runtime)).toMatchObject({
+        exempted: false,
+        requirements: { '@deepseek-ai/dsh-agent': manifest.peerDependencies['@deepseek-ai/dsh-agent'] },
       })
     }
   })
@@ -108,7 +121,7 @@ describe('AI Agent Engine real profile and browser', () => {
     await settings.getByText('Plugin status', { exact: true }).click()
     const status = settings.locator('[data-ae-compatibility]')
     await expect.poll(() => status.innerText(), { timeout: 5000 }).not.toMatch(/Unavailable|waiting|unavailable/)
-    expect((await status.innerText()).match(/\bAvailable\b/g)).toHaveLength(6)
+    expect((await status.innerText()).match(/\bAvailable\b/g)).toHaveLength(8)
     await settings.getByRole('button', { name: 'Close', exact: true }).click()
     await settings.waitFor({ state: 'detached' })
   })
@@ -190,6 +203,7 @@ describe('AI Agent Engine real profile and browser', () => {
       agentOptions: { provider: 'ae-test', model: 'fixture' },
     })
     await scaffold.ctx.sessions.flush(fork.agent.session)
+    await fork.dispose()
     const signal = new AbortController().signal
     const children = await Promise.all(['backend', 'frontend'].map(name => scaffold.ctx.agentTeams.spawnTeammate(root, {
       name, description: `${name} synthetic task`,
@@ -244,10 +258,10 @@ describe('AI Agent Engine real profile and browser', () => {
     await expect.poll(() => teamPanel.innerText()).toContain('后端工程师')
     expect(await teamPanel.innerText()).toContain('前端工程师')
     expect(await teamPanel.innerText()).toContain('工程负责人')
-    await mkdir(resolve(pluginRoot, 'output/playwright'), { recursive: true })
-    await observer.screenshot({ path: resolve(pluginRoot, 'output/playwright/team-roles-desktop.png') })
+    await mkdir(outputRoot, { recursive: true })
+    await observer.screenshot({ path: join(outputRoot, 'team-roles-desktop.png') })
     await observer.setViewportSize({ width: 390, height: 844 })
-    await observer.screenshot({ path: resolve(pluginRoot, 'output/playwright/team-roles-mobile.png') })
+    await observer.screenshot({ path: join(outputRoot, 'team-roles-mobile.png') })
     await scaffold.ctx.settings.update('locale', { preference: 'en' })
     await observer.keyboard.press('Escape')
     const selectedBefore = await row.getAttribute('aria-selected')
@@ -256,25 +270,27 @@ describe('AI Agent Engine real profile and browser', () => {
     expect(await row.getAttribute('aria-selected')).toBe(selectedBefore)
     await scaffold.ctx.settings.update('ai-agent-engine', { conversationManagement: false })
     await expect.poll(() => page.getByRole('menuitem', { name: 'Permanently delete', exact: true }).count()).toBe(0)
+    // Native menus toggle off on a repeated gesture at the same target/point.
+    await page.keyboard.press('Escape')
     expect(await scaffold.ctx.agentPresets.resolve('ai-agent-engine')).toEqual({ id: 'ai-agent-engine' })
     await scaffold.ctx.settings.update('ai-agent-engine', { conversationManagement: true })
     await row.locator('[data-ae-row-context="enabled"]').waitFor({ state: 'attached' })
     await row.click({ button: 'right' })
     await page.getByRole('menuitem', { name: 'Permanently delete', exact: true }).waitFor()
-    await mkdir(resolve(pluginRoot, 'output/playwright'), { recursive: true })
-    await page.screenshot({ path: resolve(pluginRoot, 'output/playwright/menu.png') })
+    await mkdir(outputRoot, { recursive: true })
+    await page.screenshot({ path: join(outputRoot, 'menu.png') })
     await page.getByRole('menuitem', { name: 'Permanently delete', exact: true }).click()
     const dialog = page.getByRole('dialog', { name: 'Permanently delete conversation?' })
     await dialog.waitFor()
     await expect.poll(() => dialog.innerText()).toContain('Related teammate conversations: 2')
     expect(await dialog.innerText()).toContain('will be stopped')
-    await page.screenshot({ path: resolve(pluginRoot, 'output/playwright/delete-confirmation-desktop.png') })
+    await page.screenshot({ path: join(outputRoot, 'delete-confirmation-desktop.png') })
     const desktopViewport = page.viewportSize()!
     await page.setViewportSize({ width: 390, height: 844 })
     const bounds = await dialog.boundingBox()
     expect(bounds!.x).toBeGreaterThanOrEqual(0)
     expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(390)
-    await page.screenshot({ path: resolve(pluginRoot, 'output/playwright/delete-confirmation-mobile.png') })
+    await page.screenshot({ path: join(outputRoot, 'delete-confirmation-mobile.png') })
     await page.setViewportSize(desktopViewport)
     await dialog.getByRole('button', { name: 'Cancel', exact: true }).click()
     expect(scaffold.ctx.agents.get(root.id)).toBeDefined()
@@ -290,12 +306,22 @@ describe('AI Agent Engine real profile and browser', () => {
     expect(await scaffold.ctx.sessionPersistence.stat(fork.agent.id)).toBeDefined()
     expect(JSON.stringify((await scaffold.ctx.sessionQuery.readSession(fork.agent.id)).events))
       .toContain('Synthetic engineering task')
+    const resumedFork = await scaffold.ctx.agents.resume({ resumeSessionId: fork.agent.id })
+    try {
+      expect(resumedFork.agent.session.header).toMatchObject({ parentSession: root.id, isSeeded: true })
+      expect(resumedFork.agent.session.header.origin).toBeUndefined()
+      expect(JSON.stringify(resumedFork.agent.session.snapshotEvents())).toContain('Synthetic engineering task')
+    } finally { await resumedFork.dispose() }
+    await expect(scaffold.ctx.agents.create({
+      sessionId: SessionId('owned-child-after-parent-deletion'),
+      meta: { parentSession: root.id, origin: 'subagent', delegationDepth: 1 },
+    })).rejects.toThrow('deleted')
     expect(scaffold.ctx.storageDomain.get('session_projcache')?.table('sessions').get(root.id)).toBeUndefined()
     expect((await scaffold.ctx.sessionQuery.searchSessions({ query: 'Synthetic engineering task', limit: 100 }))
       .items.some(item => item.header.id === root.id)).toBe(false)
     await observedRow.waitFor({ state: 'hidden' })
-    await mkdir(resolve(pluginRoot, 'output/playwright'), { recursive: true })
-    await page.screenshot({ path: resolve(pluginRoot, 'output/playwright/after-deletion.png') })
+    await mkdir(outputRoot, { recursive: true })
+    await page.screenshot({ path: join(outputRoot, 'after-deletion.png') })
     await page.reload()
     await page.waitForSelector('[class*="frame"]')
     expect(await page.locator(`[data-row-key="session:${root.id}"]`).count()).toBe(0)
@@ -324,6 +350,12 @@ describe('AI Agent Engine real profile and browser', () => {
       expect(recovered.some(item => item.header.id === root.id)).toBe(false)
       expect(recovered.some(item => item.header.id === fork.agent.id)).toBe(true)
       await expect(restarted.ctx.agents.resume({ resumeSessionId: root.id })).rejects.toThrow('deleted')
+      const restoredFork = await restarted.ctx.agents.resume({ resumeSessionId: fork.agent.id })
+      try {
+        expect(restoredFork.agent.session.header).toMatchObject({ parentSession: root.id, isSeeded: true })
+        expect(restoredFork.agent.session.header.origin).toBeUndefined()
+        expect(JSON.stringify(restoredFork.agent.session.snapshotEvents())).toContain('Synthetic engineering task')
+      } finally { await restoredFork.dispose() }
       const paths = (await readdir(restarted.persistenceRoot, { recursive: true })).map(path => path.replaceAll('\\', '/'))
       for (const id of [root.id, ...children.map(child => child.member.id)]) {
         expect(paths.some(path => path.includes(`/${id}/`) && /\.jsonl(?:\.zstd)?$/.test(path))).toBe(false)
@@ -399,12 +431,15 @@ describe('AI Agent Engine independent module composition', () => {
       const registry = fixture.ctx.agents[symbols.original]
       const adaptedCreate = registry.create
       const deletion = conversationCall(fixture, 'delete', { ...drainPreview.value, stopRunning: true })
+      let disabling: ReturnType<typeof entry.update> | undefined
       try {
         await stopped
-        await entry.update({ disabled: true })
+        // Newer Loaders await disposal, which must wait for this held deletion.
+        disabling = entry.update({ disabled: true })
         expect(registry.create).toBe(adaptedCreate)
       } finally { release(); stop() }
-      expect(await deletion).toMatchObject({ ok: true })
+      const [deleted] = await Promise.all([deletion, disabling])
+      expect(deleted).toMatchObject({ ok: true })
       await fixture.ctx.loader.await()
       await vi.waitFor(() => expect(registry.create).not.toBe(adaptedCreate))
       expect(await fixture.ctx.sessionPersistence.stat(draining.agent.id)).toBeUndefined()
@@ -442,7 +477,7 @@ describe('AI Agent Engine independent module composition', () => {
         const settings = coexistPage.getByRole('dialog', { name: 'Settings', exact: true })
         await settings.getByText('Plugin status', { exact: true }).click()
         await expect.poll(() => settings.locator('[data-ae-compatibility] tbody td:last-child').allTextContents())
-          .toEqual(['Available', 'Available', 'Available'])
+          .toEqual(['Available', 'Available', 'Available', 'Available'])
       } finally { await coexistBrowser.close() }
       if (engineering) {
         const adapter = new MockAdapter(['hang'])

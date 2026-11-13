@@ -1,17 +1,17 @@
 import type { InvocationDescriptor, TypertRemoteContribution } from '@deepseek-ai/dsh-typert-protocol'
-import { z } from 'zod'
+import { array as z_array, literal as z_literal, strictObject as z_strictObject, string as z_string, type ZodType as z_ZodType } from 'zod'
 
 const namespace = 'aeConversations'
-const identity = z.string().min(1)
-const previewRequest = z.strictObject({ sessionId: identity })
-const preview = z.strictObject({
-  sessionId: identity, sessionIds: z.array(identity).min(1),
-  fingerprint: z.string().regex(/^[a-f0-9]{64}$/),
-  runningSessionIds: z.array(identity),
+const identity = z_string().min(1)
+const previewRequest = z_strictObject({ sessionId: identity })
+const preview = z_strictObject({
+  sessionId: identity, sessionIds: z_array(identity).min(1),
+  fingerprint: z_string().regex(/^[a-f0-9]{64}$/),
+  runningSessionIds: z_array(identity),
 })
-const confirmation = preview.extend({ stopRunning: z.literal(true) })
+const confirmation = preview.extend({ stopRunning: z_literal(true) })
 
-function codec(schema: z.ZodType, name: string) {
+function codec(schema: z_ZodType, name: string) {
   return { mode: 'strict' as const, typeSymbol: `ai-agent-engine-deepseek#${name}`, create: () => schema }
 }
 
@@ -24,6 +24,6 @@ export const deletionRpc: TypertRemoteContribution = {
       name: 'request', wire: 'request', source: 'json',
       codec: codec(method === 'deletePreview' ? previewRequest : confirmation, `${method}Request`),
     }],
-    result: codec(method === 'deletePreview' ? preview : z.array(identity), `${method}Result`),
+    result: codec(method === 'deletePreview' ? preview : z_array(identity), `${method}Result`),
   })),
 }

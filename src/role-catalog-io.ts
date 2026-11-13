@@ -4,6 +4,7 @@ import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import {
   BUILTIN_ROLES,
+  RoleOverlayValidationError,
   parseRolesFile,
   type RoleCatalogOptions,
   type RoleCatalogResult,
@@ -21,7 +22,8 @@ export function resolveRolesFilePath(rolesPath?: string): string | undefined {
   return join(home, 'ai-agent-engine', 'roles.json')
 }
 
-/** Read raw overlay document without merging; missing file returns undefined. */
+/** Read a complete editable overlay. Only ENOENT means missing; other read or
+ * validation errors reject so editing cannot overwrite unreadable saved data. */
 export async function readOverlayDocument(
   path: string,
   warn: (message: string, ...args: unknown[]) => void = () => undefined,
@@ -32,12 +34,18 @@ export async function readOverlayDocument(
   } catch (error) {
     const code = (error as NodeJS.ErrnoException).code
     if (code === 'ENOENT') return undefined
-    warn('Failed to read role overlay at %s (%s)', path, code ?? 'error')
-    return undefined
+    warn('Failed to read role overlay at %s (%s); refusing editor load', path, code ?? 'error')
+    throw error
   }
-  const roles = parseRolesFile(text, warn)
-  if (!roles) return undefined
-  return { version: 1, roles }
+  try {
+    return validateRolesFile(JSON.parse(text))
+  } catch (error) {
+    const failure = error instanceof SyntaxError
+      ? new RoleOverlayValidationError('Role overlay JSON is corrupt') : error
+    warn('Invalid role overlay at %s (%s); refusing editor load', path,
+      failure instanceof Error ? failure.message : failure)
+    throw failure
+  }
 }
 
 /** Persist overlay atomically (temp + rename). Validates before any write. */

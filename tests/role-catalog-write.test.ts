@@ -1,7 +1,7 @@
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   BUILTIN_ROLES,
   RoleOverlayValidationError,
@@ -15,6 +15,11 @@ import {
   resolveRoleCatalog,
   writeRolesFile,
 } from '../src/role-catalog-io.ts'
+
+vi.mock('node:fs/promises', async importOriginal => {
+  const original = await importOriginal<typeof import('node:fs/promises')>()
+  return { ...original, readFile: vi.fn(original.readFile) }
+})
 
 describe('role overlay write path', () => {
   it('writes atomically and rejects invalid payloads without persisting', async () => {
@@ -79,14 +84,39 @@ describe('role overlay write path', () => {
     expect(() => validateRolesFile({ version: 1, roles: [{ id: 'Bad_Id' }] })).toThrow(RoleOverlayValidationError)
   })
 
-  it('readOverlayDocument isolates corrupt JSON', async () => {
+  it.each([
+    ['corrupt JSON', '{broken'],
+    ['unsupported version', '{"version":2,"roles":[]}'],
+    ['invalid root', 'null'],
+    ['missing roles', '{"version":1}'],
+    ['invalid sibling', '{"version":1,"roles":[{"id":"frontend","responsibility":"Keep me"},{"id":"lead"}]}'],
+    ['duplicate identities', '{"version":1,"roles":[{"id":"frontend"},{"id":"frontend"}]}'],
+  ])('refuses editing %s without changing the original document', async (_name, text) => {
     const directory = await mkdtemp(join(tmpdir(), 'ae-roles-read-'))
     const path = join(directory, 'roles.json')
     try {
-      await writeFile(path, '{broken', 'utf8')
-      const warn = [] as string[]
-      expect(await readOverlayDocument(path, message => { warn.push(message) })).toBeUndefined()
-      expect(warn.length).toBeGreaterThan(0)
+      await writeFile(path, text, 'utf8')
+      await expect(readOverlayDocument(path)).rejects.toBeInstanceOf(RoleOverlayValidationError)
+      expect(await readFile(path, 'utf8')).toBe(text)
+    } finally {
+      await rm(directory, { recursive: true, force: true })
+    }
+  })
+
+  it.each(['EIO', 'EACCES'])('propagates %s for editing while the policy resolver still falls back', async code => {
+    const directory = await mkdtemp(join(tmpdir(), 'ae-roles-read-io-'))
+    const path = join(directory, 'roles.json')
+    const document = { version: 1, roles: [{ id: 'frontend', responsibility: 'Preserved custom brief' }] }
+    const text = JSON.stringify(document)
+    try {
+      await writeFile(path, text, 'utf8')
+      const failure = Object.assign(new Error(`Synthetic ${code}`), { code })
+      vi.mocked(readFile).mockRejectedValueOnce(failure)
+      await expect(readOverlayDocument(path)).rejects.toBe(failure)
+      expect(await readFile(path, 'utf8')).toBe(text)
+      vi.mocked(readFile).mockRejectedValueOnce(failure)
+      await expect(resolveRoleCatalog({ enabled: true, path })).resolves.toMatchObject({ source: 'builtin', roles: BUILTIN_ROLES })
+      await expect(readOverlayDocument(path)).resolves.toEqual(document)
     } finally {
       await rm(directory, { recursive: true, force: true })
     }

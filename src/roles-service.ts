@@ -99,7 +99,14 @@ export class RoleCatalogService extends TypertRemoteService {
     this.authorize()
     const path = resolveRolesFilePath(this.config.rolesPath)
     if (!path) return { version: 1, roles: [], exists: false }
-    const document = await readOverlayDocument(path, (message, ...args) => this.warn(message, ...args))
+    let document
+    try {
+      document = await readOverlayDocument(path, (message, ...args) => this.warn(message, ...args))
+    } catch (error) {
+      if (error instanceof RoleOverlayValidationError) reject(error.message, 'ae-roles/invalid-overlay')
+      const code = (error as NodeJS.ErrnoException).code
+      reject(`Could not read role overlay${typeof code === 'string' ? ` (${code})` : ''}. Existing configuration was not changed; retry loading.`)
+    }
     if (!document) return { version: 1, roles: [], path, exists: false }
     return { version: 1, roles: document.roles.map(role => ({ ...role })), path, exists: true }
   }

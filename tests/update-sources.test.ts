@@ -1,3 +1,7 @@
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { gzipSync } from 'node:zlib'
 import { describe, expect, it } from 'vitest'
 import {
   UpdateSourceError,
@@ -5,6 +9,7 @@ import {
   normalizeRelease,
   parseChecksum,
   parseVersion,
+  readPackageIdentity,
   releaseVersionOf,
 } from '../src/update-sources.ts'
 
@@ -51,11 +56,99 @@ describe('release documents', () => {
     expect(release.notes).toBe('Update button')
   })
 
+  it('never selects another package or another version as a fallback', () => {
+    const release = normalizeRelease({
+      tag_name: 'v0.2.5',
+      assets: [
+        { name: 'other-plugin-0.2.5.tgz', browser_download_url: 'https://example.invalid/other.tgz' },
+        { name: 'ai-agent-engine-deepseek-0.2.4.tgz', browser_download_url: 'https://example.invalid/old.tgz' },
+        { name: 'SHA256SUMS.txt', browser_download_url: 'https://example.invalid/sums' },
+      ],
+    })
+    expect(release.assetUrl).toBeUndefined()
+    expect(release.assetName).toBeUndefined()
+  })
+
+  it('binds a configured plugin name to the exact release asset', () => {
+    const release = normalizeRelease({ version: '1.2.3', assets: [
+      { name: 'ai-agent-engine-deepseek-1.2.3.tgz', browser_download_url: 'https://example.invalid/wrong' },
+      { name: 'scope-plugin-1.2.3.tgz', browser_download_url: 'https://example.invalid/right' },
+    ] }, '@scope/plugin')
+    expect(release.assetUrl).toBe('https://example.invalid/right')
+  })
+
   it('accepts a hand-written version field and rejects a document without one', () => {
     expect(normalizeRelease({ version: '1.0.0', assets: [] }).version).toBe('1.0.0')
     expect(() => normalizeRelease({ name: 'no version' })).toThrow(UpdateSourceError)
     expect(() => normalizeRelease({ tag_name: 'nightly' })).toThrow(UpdateSourceError)
     expect(() => normalizeRelease([])).toThrow(UpdateSourceError)
+  })
+})
+
+function tarEntry(name: string, content: string, kind = '0'): Buffer {
+  const bytes = Buffer.from(content)
+  const header = Buffer.alloc(512)
+  header.write(name, 0)
+  header.write('0000644\0', 100)
+  header.write('0000000\0', 108)
+  header.write('0000000\0', 116)
+  header.write(`${bytes.length.toString(8).padStart(11, '0')}\0`, 124)
+  header.write('00000000000\0', 136)
+  header.fill(32, 148, 156)
+  header.write(kind, 156)
+  header.write('ustar\0', 257)
+  header.write('00', 263)
+  header.write(`${header.reduce((sum, byte) => sum + byte, 0).toString(8).padStart(6, '0')}\0 `, 148)
+  return Buffer.concat([header, bytes, Buffer.alloc((512 - bytes.length % 512) % 512)])
+}
+
+async function withArchive(entries: Buffer[], run: (path: string) => Promise<void>): Promise<void> {
+  const directory = await mkdtemp(join(tmpdir(), 'ae-package-identity-'))
+  try {
+    const file = join(directory, 'package.tgz')
+    await writeFile(file, gzipSync(Buffer.concat([...entries, Buffer.alloc(1024)])))
+    await run(file)
+  } finally { await rm(directory, { recursive: true, force: true }) }
+}
+
+describe('package manifest identity', () => {
+  const manifest = JSON.stringify({ name: 'ai-agent-engine-deepseek', version: '1.2.3' })
+
+  it('reads a regular npm manifest without extracting any files', async () => {
+    await withArchive([tarEntry('package/package.json', manifest)], async file => {
+      expect(await readPackageIdentity(file)).toEqual({ name: 'ai-agent-engine-deepseek', version: '1.2.3' })
+    })
+  })
+
+  it.each(['package/x/../package.json', './package/package.json', 'package\\package.json', 'package//package.json',
+    'other/package.json', 'package/Package.json', 'package/package.json.', 'package/package.json/'])('rejects a later normalized manifest alias: %s', async name => {
+    await withArchive([tarEntry('package/package.json', manifest), tarEntry(name, JSON.stringify({ name: 'other-plugin', version: '9.9.9' }))], async file => {
+      await expect(readPackageIdentity(file)).rejects.toThrow()
+    })
+  })
+
+  it('rejects duplicate manifests and link entries', async () => {
+    await withArchive([tarEntry('package/package.json', manifest), tarEntry('package/package.json', manifest)], async file => {
+      await expect(readPackageIdentity(file)).rejects.toThrow()
+    })
+    await withArchive([tarEntry('package/package.json', manifest), tarEntry('package/alias', '', '2')], async file => {
+      await expect(readPackageIdentity(file)).rejects.toThrow()
+    })
+  })
+
+  it('rejects a PAX path that aliases the manifest through a parent directory', async () => {
+    const record = 'path=package/x/../package.json\n'
+    let length = Buffer.byteLength(record) + 2
+    while (Buffer.byteLength(`${length} ${record}`) !== length) length = Buffer.byteLength(`${length} ${record}`)
+    await withArchive([
+      tarEntry('package/package.json', manifest), tarEntry('package/pax', `${length} ${record}`, 'x'), tarEntry('package/other', manifest),
+    ], async file => { await expect(readPackageIdentity(file)).rejects.toThrow() })
+  })
+
+  it('fails closed on archives without a manifest', async () => {
+    await withArchive([tarEntry('package/readme.txt', 'no manifest')], async file => {
+      await expect(readPackageIdentity(file)).rejects.toThrow()
+    })
   })
 })
 
@@ -66,11 +159,14 @@ describe('checksum documents', () => {
   it('matches the requested file name', () => {
     const document = `${other}  other.tgz\n${digest}  ai-agent-engine-deepseek-0.2.5.tgz\n`
     expect(parseChecksum(document, 'ai-agent-engine-deepseek-0.2.5.tgz')).toBe(digest)
-    expect(parseChecksum(document, 'missing.tgz')).toBe(other)
+    expect(parseChecksum(document, 'missing.tgz')).toBeUndefined()
   })
 
-  it('falls back to the first digest of a single-line document', () => {
-    expect(parseChecksum(`${digest}\n`, 'anything.tgz')).toBe(digest)
+  it('rejects bare, malformed and ambiguous digests instead of authorizing another asset', () => {
+    expect(parseChecksum(`${digest}\n`, 'anything.tgz')).toBeUndefined()
     expect(parseChecksum('not a digest', 'anything.tgz')).toBeUndefined()
+    expect(parseChecksum(`${digest}  pkg.tgz\n${other}  pkg.tgz`, 'pkg.tgz')).toBeUndefined()
+    expect(parseChecksum(`${digest}  pkg.tgz\n${digest}  pkg.tgz`, 'pkg.tgz')).toBeUndefined()
+    expect(parseChecksum(`${digest.toUpperCase()} *pkg.tgz\r\n`, 'pkg.tgz')).toBe(digest)
   })
 })

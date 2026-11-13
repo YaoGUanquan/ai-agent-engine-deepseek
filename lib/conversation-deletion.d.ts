@@ -31,7 +31,8 @@ export declare function supportsConversationDeletionPersistence(persistence: {
 }): boolean;
 /**
  * Read one deletion journal. Corrupt or invalid files are renamed with a
- * `.corrupt` suffix and skipped so plugin init can continue.
+ * `.corrupt` suffix and skipped so plugin init can continue. Read failures are
+ * preserved and rethrown: an unavailable journal must remain recoverable.
  */
 export declare function loadDeletionJournalFile(directory: string, filename: string, log: (format: string, ...args: unknown[]) => void): Promise<DeletionRecord | undefined>;
 /** Plugin-owned lifecycle and storage adapter; never changes installed host files. */

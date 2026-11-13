@@ -31,6 +31,12 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
     model: { services: [], events: [], objects: [] }, invocations: pluginRpc.descriptors,
   })
   const statuses = initialModuleStatuses()
+  // Loader volatile events target only this fiber, not the engineering child.
+  ctx.on('loader/volatile-update', paths => {
+    if (paths.some(path => path.length === 1 && path[0] === 'rolesEnabled')) {
+      ctx.emit('ai-agent-engine/roles-updated')
+    }
+  })
   await ctx.plugin(CompatibilityService, { statuses })
   mountModule(ctx, 'update', ['typert'], {}, statuses, async scope => {
     const { UpdateService } = await import('./update-service.ts')

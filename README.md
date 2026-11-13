@@ -25,21 +25,21 @@
 
 | 项目 | 当前支持范围 |
 | --- | --- |
-| 插件版本（当前源码，尚未发布） | `0.2.5` |
+| 插件版本（当前源码，尚未发布） | `0.2.6` |
 | DeepSeek Harness（允许加载） | `>=0.2.1-rc.5`（只有下限） |
-| 实际运行验证基线 | `0.2.1-rc.5` |
-| Desktop 实机验证 | Windows 原版 Desktop |
+| Windows 官方源码宿主 + Chromium 隔离验证 | `0.2.1-rc.5`、`0.2.2-rc.1` |
+| Desktop 实机验证 | 历史记录为 Windows 原版 rc.5；本轮未更新当前 Desktop 安装 |
 
 其他版本和平台尚未完成实机验证。
 
 宿主加载门禁只看 `engines.dsh`，本插件已改为只声明下限 `>=0.2.1-rc.5`：
 Harness 升到 `0.2.2`、`1.0` 等更高版本时不再因版本号被判不兼容而拒绝加载。
-`dsh.compatibility.verifiedThrough` 记录真正跑过的最高版本，超过它只在设置页标注“未经实测”，不阻止加载。
-运行依赖与 peer 仍固定在实测窗口 `>=0.2.1-rc.5 <0.2.2-0`，避免插件被装到未验证的宿主内部库里。
+`dsh.compatibility.verifiedThrough` 记录最高实测宿主版本 `0.2.2-rc.1`；`verifiedRuntimes` 明确列出实际验证过的 `0.2.1-rc.5` 和 `0.2.2-rc.1`。未列出的版本会标注“未经实测”，不阻止加载，也不把两个实测点之间的所有版本当作已验证。
+运行依赖与 peer 仍固定在 rc.5 的库窗口 `>=0.2.1-rc.5 <0.2.2-0`；这与宿主实测版本分开记录，本轮没有自动升级插件依赖。
 基础加载协议、RPC 或模块导出发生破坏性变化时仍需更新插件；设置页的“插件状态”会指出具体哪一层不可用。
 已发布的旧标签（`v0.2.3` 及更早）安装包里写死的仍是旧的兼容范围与旧行为，
-要拿到“更新按钮 + 只声明下限”的加载策略，需安装 `ai-agent-engine-deepseek-0.2.5.tgz` 或更新构建，
-不能靠重新安装原有固定标签获得。`github:YaoGUanquan/ai-agent-engine-deepseek#v0.2.5` 仅在该标签正式发布后可用。
+要拿到“更新按钮 + 只声明下限”的加载策略，需安装 `ai-agent-engine-deepseek-0.2.6.tgz` 或更新构建，
+不能靠重新安装原有固定标签获得。`github:YaoGUanquan/ai-agent-engine-deepseek#v0.2.6` 仅在该标签正式发布后可用。
 
 ### 自动兼容与降级
 
@@ -51,7 +51,7 @@ Harness 升到 `0.2.2`、`1.0` 等更高版本时不再因版本号被判不兼�
 永久删除只接受已知的 JSONL 后端和搜索索引结构。
 能力检查在恢复删除日志、安装方法包装和删除数据前执行；不兼容时禁止删除。
 插件不修改 Desktop、不自动添加版本豁免；更新只发生在你点击“立即更新”之后，
-由宿主的插件管理器安装，失败时报告原因且不改动已有安装。
+由宿主的插件管理器安装；失败时报告实际结果，检出更新会保留可重试的阶段和备份。
 
 ### 在 Desktop 中安装
 
@@ -61,7 +61,7 @@ Harness 升到 `0.2.2`、`1.0` 等更高版本时不再因版本号被判不兼�
 4. 完全退出并重新打开 Desktop。
 
 ```text
-github:YaoGUanquan/ai-agent-engine-deepseek#v0.2.5
+github:YaoGUanquan/ai-agent-engine-deepseek#v0.2.6
 ```
 
 已经安装旧版时，按下文的[更新步骤](#更新与回退)操作。
@@ -70,7 +70,7 @@ github:YaoGUanquan/ai-agent-engine-deepseek#v0.2.5
 
 ### 下载安装包
 
-也可以打开 [Releases](https://github.com/YaoGUanquan/ai-agent-engine-deepseek/releases/latest)，下载 `ai-agent-engine-deepseek-0.2.5.tgz`，在插件管理器的“包名或地址”中填写该文件的绝对路径，再安装、启用并重启。
+也可以打开 [Releases](https://github.com/YaoGUanquan/ai-agent-engine-deepseek/releases/latest)，下载 `ai-agent-engine-deepseek-0.2.6.tgz`，在插件管理器的“包名或地址”中填写该文件的绝对路径，再安装、启用并重启。
 
 每个 Release 都提供版本说明、兼容范围和 `SHA256SUMS.txt` 校验文件。普通用户选择 `.tgz` 插件包即可；GitHub 自动生成的 “Source code” 是源码归档，供开发者使用。
 
@@ -92,15 +92,22 @@ github:YaoGUanquan/ai-agent-engine-deepseek#v0.2.5
 | 已是最新 | 只提示“当前已是最新发布版本” |
 | 宿主没有插件管理器 | 按钮禁用，提示无法安装 |
 | 新版本 `engines.dsh` 拒绝当前 Harness | 报告不兼容，不安装；先升级 Harness |
-| 下载包与 `SHA256SUMS.txt` 不符 | 校验失败，不安装 |
-| 插件以 `link:` 检出方式安装 | 走 git 通道：`fetch` + `merge --ff-only` + 重建；有本地改动时拒绝执行 |
+| 包名、版本或包内清单与 Release 不符 | 阻止安装，报告身份不匹配 |
+| 缺少摘要、摘要无法唯一匹配安装包或字节不符 | 校验失败，不安装 |
+| 宿主安装失败、取消或被配置覆盖 | 如实显示结果，不标记更新成功；可恢复的失败允许重试 |
+| 依赖脚本等待批准 | 显示脚本名称，由用户在宿主插件管理器处理，不自动批准 |
+| 插件以 `link:` 检出方式安装 | 固定上游目标，在隔离目录安装依赖、构建后再 `merge --ff-only` 和替换产物；有本地改动时拒绝执行 |
 
 更新通道由安装方式决定：安装包（`.tgz`、`github:` 地址）走下载安装，`link:` 或本地 git 检出走上游合并。
 `dsh.compatibility.verifiedThrough` 记录的版本是实测基线；Harness 更新后即使版本号超出该基线，
 插件仍会加载，设置页标注“未经实测”，不会静默禁用。
 
-安装地址中的 `#v0.2.5` 表示固定版本。重新启动 Desktop 本身不会自动变成未来的新版本；
+安装地址中的 `#v0.2.6` 表示固定版本。重新启动 Desktop 本身不会自动变成未来的新版本；
 自动更新只发生在你点击“立即更新”之后。
+
+检出更新会把未完成的目标和阶段保存在该检出的 Git 元数据目录中。依赖安装、构建或产物替换失败后，设置页保留原因并允许继续剩余步骤；重启后也能读取待完成任务。准备过程不改变原有依赖和产物，替换前再次检查分支、HEAD 和本地改动。旧的依赖及产物目录保留为备份，不自动重置源码或删除用户未跟踪文件。依赖安装使用 `--ignore-scripts`，只显式执行插件构建脚本。
+
+若快进合并已经完成、随后产物替换失败，HEAD 不会自动回退；此时磁盘上的源码、依赖和产物可能尚未全部切换。应先重试完成保留的更新任务，再重启 Desktop；这类失败不能视为旧版安装完全未变。
 
 ### 手动升级
 
@@ -115,7 +122,7 @@ github:YaoGUanquan/ai-agent-engine-deepseek#v0.2.5
 例如，从 `0.2.1` 升级到当前版本时填写：
 
 ```text
-github:YaoGUanquan/ai-agent-engine-deepseek#v0.2.5
+github:YaoGUanquan/ai-agent-engine-deepseek#v0.2.6
 ```
 
 卸载插件不会替你删除已有对话。更新期间也不需要移除 Harness 的会话目录、记忆或项目文件。
@@ -127,7 +134,7 @@ github:YaoGUanquan/ai-agent-engine-deepseek#v0.2.5
 3. 重启后，在 **插件** 页打开 `ai-agent-engine-deepseek`，核对版本、安装来源和启用状态。
 4. 打开原有对话，确认历史仍可查看；已有自定义配置也应重新核对。
 
-插件版本 `0.2.5` 与 Harness 版本 `0.2.1-rc.5` 是两个不同的版本号。更新插件不会替你升级或替换 Desktop。
+插件版本 `0.2.6` 与 Harness 版本 `0.2.1-rc.5` 是两个不同的版本号。更新插件不会替你升级或替换 Desktop。
 
 如果重启后仍显示旧版，请先确认卸载、安装操作发生在当前正在使用的 Desktop 中，再检查是否还有旧的后台实例。只下载 `.tgz` 或只打开 Release 页面不会更新已安装插件。
 
@@ -224,7 +231,7 @@ github:YaoGUanquan/ai-agent-engine-deepseek#v0.2.2
 
 永久删除依赖 JSONL 会话持久化。若宿主使用非 JSONL 后端，插件会**关闭删除能力**并继续加载工程技能；调用删除时返回不可用（`delete-unsupported`），不会拖垮整插件。
 
-若 `.ai-agent-engine/deletions/` 下某条删除记录文件损坏，插件会将其改名为 `*.json.corrupt` 并写入日志，跳过该条后继续启动，其余有效记录照常恢复。
+若 `.ai-agent-engine/deletions/` 下某条删除记录的内容损坏，插件会将其改名为 `*.json.corrupt` 并写入日志，跳过该条后继续启动，其余有效记录照常恢复。临时读取失败、权限或设备 I/O 错误不会被当作内容损坏：原日志会保留，删除模块报告初始化失败，排除读取故障后重新加载插件可继续恢复。模块不可用期间不能依赖本插件提供删除墓碑保护。
 
 ### 改了角色（设置页或 roles.json），为什么旧队友没变？
 
@@ -236,7 +243,7 @@ github:YaoGUanquan/ai-agent-engine-deepseek#v0.2.2
 
 ### 角色文件损坏或路径无效会怎样？
 
-插件会打日志并退回内置种子，**不应**导致无法启动。修好 JSON、修正 `rolesPath`，或暂时关闭 `rolesEnabled` 即可。
+策略读取会打日志并退回内置种子，**不应**导致无法启动。编辑页采用严格读取：文件不可读、JSON 损坏或存在非法行时会显示错误并禁止保存，避免把故障误当空配置覆盖原文件。修好 JSON、修正 `rolesPath` 或排除读取错误后重新加载；暂时关闭 `rolesEnabled` 可让策略使用内置种子。
 
 ### 能在设置页里可视化编辑角色吗？
 
@@ -244,9 +251,11 @@ github:YaoGUanquan/ai-agent-engine-deepseek#v0.2.2
 
 也可以继续手改 `$DSH_HOME/ai-agent-engine/roles.json`（或 `rolesPath`）；设置页与文件读写**同一份** overlay。保存后 Lead 策略会重建，**新创建**的队友生效；已 spawn 队友不重绑。
 
+页面成功读取角色目录和保存的 overlay 后才允许保存或恢复默认，保存期间锁定编辑，失败保留草稿。`rolesEnabled` 关闭时页面仍编辑保存的自定义配置，重新开启后继续使用；切换开关会刷新 Lead 策略。
+
 ### 多个对话一起用前端/后端队友会不会串角色？
 
-无 overlay（或未启用合并）时，多对话并行或交替调用内置角色**应保持**默认种子行为、彼此不串。一期契约与多对话冒烟曾对 tip `85600bac`（#5）验收；二期设置页（tip `92a3189` / #7）相关多对话与设置持久化，**测侧进行中，本文不宣称已冒烟通过**。已创建队友不会因为你改设置页或 `roles.json` 而自动换提示词。
+目录解析和策略构建返回独立结果，并有并发解析、过期刷新及卸载回归；本轮隔离宿主还验证了同一团队的前后端队友并发。跨多个真实模型对话的完整回归仍未重新执行。已创建队友不会因为你改设置页或 `roles.json` 而重绑角色 brief。
 
 ### 会改变默认模式或数据目录吗？
 
@@ -254,9 +263,9 @@ github:YaoGUanquan/ai-agent-engine-deepseek#v0.2.2
 
 ### 当前版本验证过哪些功能？
 
-`0.2.3` 支持工程角色 overlay 与设置页可视化编辑（#5 文件契约 + #7 `settings.section`「工程角色」/`aeRoles`）。开发者本机可对 tip `92a3189` 跑通 `check:all`（含角色相关单测）。一期测侧曾对 tip `85600bac` 验收文件契约与多对话冒烟；**二期设置页与多对话回归测侧进行中，勿将「应保持」理解为已冒烟通过**。完整 Desktop 实机双队友与永久删除历史证据仍沿用 `0.2.0`/`0.2.1` 验收记录，详见 [VALIDATION](compat/harness/VALIDATION.md)。
+当前未发布源码通过 `npm run check:all`：Host/Client 类型检查、公开资源校验、22 个文件的 136 项测试及构建。Windows 官方 rc.5 与 0.2.2-rc.1 源码宿主/Chromium 两组各 10 项隔离回归通过，覆盖工程模式、角色页、并发队友、主对话及所属队友删除、独立分叉恢复、删除中卸载和官方 Team 共存。
 
-真实模型创建前后端队友、角色显示和永久删除功能的完整实机验收，仍来自 `0.2.0`/`0.2.1` 记录；本版本未重新删除用户既有对话做实机验收。无覆盖文件时，内置角色行为应与 `0.2.2` / tip `6b638b7` 口径一致。
+隔离回归使用合成会话和 MockAdapter，本轮没有调用付费模型、删除既有用户历史或更新当前 Desktop 安装。真实模型与原版 Desktop 的历史验收证据保留在验收记录中；其他平台、任意模型及完整多对话真实模型回归仍未重新验证。
 
 详细环境、检查结果和未验证范围见[验收记录](compat/harness/VALIDATION.md)。
 
@@ -272,9 +281,9 @@ npm run check:all
 npm pack
 ```
 
-构建后可在 Desktop 插件管理器中安装生成的 `ai-agent-engine-deepseek-0.2.5.tgz`。提交源码变更时应同步构建产物 `lib/`，保证 Git 地址安装可直接使用。
+构建后可在 Desktop 插件管理器中安装生成的 `ai-agent-engine-deepseek-0.2.6.tgz`。提交源码变更时应同步构建产物 `lib/`，保证 Git 地址安装可直接使用。
 
-使用未修改的官方 Harness `dsh-v0.2.1-rc.5` 源码完成依赖安装和构建后运行集成验收；测试入口会拒绝版本不匹配的宿主：
+使用未修改的官方 Harness `dsh-v0.2.1-rc.5` 或 `dsh-v0.2.2-rc.1` 源码完成其声明的依赖安装和完整构建后运行集成验收。入口检查 `engines.dsh` 下限，版本门禁放行不等于运行验证；生成目录和截图可通过 `AE_HARNESS_TEST_DIR`、`AE_HARNESS_OUTPUT_ROOT` 外置：
 
 ```bash
 node tools/harness-integration.mjs "<official-harness-source-directory>"
@@ -316,7 +325,7 @@ Host 通过 `aeRoles`（`getCatalog` / `getOverlay` / `putOverlay` / `restoreDef
 - **不要**把角色文件放进工作区 `.ai-agent-engine/`（该目录仍仅用于删除记录 journal）
 - **可覆盖字段**：仅 `skill`、`responsibility`（按角色 `id`）。团队面板中文职称仍由 locales 决定，**不**改 UI 展示名
 - **合并**：按 `id` 深合并到包内 builtin 种子；只覆盖文件中出现的字段；未知 `id` 追加。插件升级后，内置文案随包刷新，未在 overlay 中出现的字段跟随新种子
-- **多对话**：无 overlay（或 `rolesEnabled=false`）时，多对话并行/交替调用内置 frontend/backend 等角色**应保持**默认种子、彼此不串（二期相关测侧进行中，不宣称已冒烟通过）
+- **多对话**：并发目录解析和策略刷新有回归；完整多对话真实模型用例尚未重新验证，不能把单元测试或同团队并发等同于该层验收
 
 示例（与设置页保存格式一致）：
 

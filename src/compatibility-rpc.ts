@@ -1,10 +1,10 @@
 import type { RemoteResult, TypertRemoteContribution } from '@deepseek-ai/dsh-typert-protocol'
-import { z } from 'zod'
+import { enum as z_enum, strictObject as z_strictObject } from 'zod'
 import type { ModuleStatuses } from './module-runtime.ts'
 
-const status = z.strictObject({
-  state: z.enum(['waiting', 'ready', 'unavailable']),
-  reason: z.enum(['services', 'interface', 'initialization', 'storage']).optional(),
+const status = z_strictObject({
+  state: z_enum(['waiting', 'ready', 'unavailable']),
+  reason: z_enum(['services', 'interface', 'initialization', 'storage']).optional(),
 })
 
 export interface CompatibilityRemote {
@@ -23,11 +23,11 @@ export const compatibilityRpc: TypertRemoteContribution = {
     invocation: { kind: 'direct' },
     parameters: [{
       name: 'request', wire: 'request', source: 'json',
-      codec: { mode: 'strict', typeSymbol: 'ai-agent-engine-deepseek#statusRequest', create: () => z.strictObject({}) },
+      codec: { mode: 'strict', typeSymbol: 'ai-agent-engine-deepseek#statusRequest', create: () => z_strictObject({}) },
     }],
     result: {
       mode: 'strict', typeSymbol: 'ai-agent-engine-deepseek#statusResult',
-      create: () => z.strictObject({ engineering: status, roles: status, deletion: status, update: status }),
+      create: () => z_strictObject({ engineering: status, roles: status, deletion: status, update: status }),
     },
   }],
 }

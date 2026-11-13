@@ -1,2 +1,2 @@
-/** Bridge the official row's existing action menu without selecting the row. */
+/** Bridge legacy rows; rows with a native menu keep their own gesture handler. */
 export declare function attachRowContextMenu(marker: HTMLElement, sessionId: string): () => void;
