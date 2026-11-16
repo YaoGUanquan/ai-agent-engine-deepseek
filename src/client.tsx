@@ -119,7 +119,7 @@ export async function apply(ctx: Context): Promise<void> {
   }, statuses, async scope => {
     try {
       const configured = [...scope.loader.entries()].some(entry =>
-        entry.options.name === '@deepseek-ai/dsh-experimental-client-ui-agent-team' && !entry.disabled)
+        ['@deepseek-ai/dsh-client-ui-agent-team', '@deepseek-ai/dsh-experimental-client-ui-agent-team'].includes(entry.options.name) && !entry.disabled)
       const existing = scope.slots.entries('conversation.session.header.actions').some(entry => entry.options.id === 'agent-team')
       if (!configured && !existing) {
         const official = await import('@deepseek-ai/dsh-experimental-client-ui-agent-team/client')

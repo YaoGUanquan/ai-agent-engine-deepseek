@@ -79,10 +79,10 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
 
 async function installEngineering(ctx: Context, config: Config, statuses: import('./module-runtime.ts').ModuleStatuses): Promise<false> {
   const [
-    { default: AgentPreset }, { default: TeamService }, engineering,
+    { default: AgentPreset }, engineering,
     { installSkills }, { entryListProblem }, { entryListSchema }, { load },
   ] = await Promise.all([
-    import('@deepseek-ai/dsh-agent-preset'), import('@deepseek-ai/dsh-experimental-agent-team'),
+    import('@deepseek-ai/dsh-agent-preset'),
     import('./engineering.ts'), import('./skills.ts'),
     import('@deepseek-ai/dsh-agent-preset-registry'),
     import('@deepseek-ai/cordis-plugin-include'), import('js-yaml'),
@@ -91,17 +91,20 @@ async function installEngineering(ctx: Context, config: Config, statuses: import
   // A configured official service may still be starting. Its separately
   // installed module cannot be deduplicated by class identity.
   const configuredTeam = [...ctx.loader.entries()].some(entry =>
-    entry.options.name === '@deepseek-ai/dsh-experimental-agent-team' && !entry.disabled)
-  if (!ctx.get('agentTeams') && !configuredTeam) await ctx.plugin(TeamService, { maxMembers: config.maxMembers })
+    ['@deepseek-ai/dsh-agent-team', '@deepseek-ai/dsh-experimental-agent-team'].includes(entry.options.name) && !entry.disabled)
+  if (!ctx.get('agentTeams') && !configuredTeam) {
+    const { default: TeamService } = await import('@deepseek-ai/dsh-experimental-agent-team')
+    await ctx.plugin(TeamService, { maxMembers: config.maxMembers })
+  }
   const standard = await ctx.agentPresets.readDocument('standard')
   const plugins: unknown = load(standard.content, { schema: entryListSchema })
   const problem = entryListProblem(plugins)
   if (problem) throw new Error(`The Standard preset cannot be used as the engineering base: ${problem}`)
   const globalTeamTools = [...ctx.loader.entries()].some(entry =>
-    entry.options.name === '@deepseek-ai/dsh-experimental-tool-agent-team' && !entry.disabled)
-  mountModule(ctx, 'engineering', ['agentTeams'], {
-    agentTeams: ['spawnTeammate', 'sendMessage', 'listMembers', 'listTasks', 'createTask', 'updateTask', 'waitForChange', 'interrupt'],
-  }, statuses, async ready => {
+    ['@deepseek-ai/dsh-tool-agent-team', '@deepseek-ai/dsh-experimental-tool-agent-team'].includes(entry.options.name) && !entry.disabled)
+  // Team operations belong to the official tools, whose API follows the Host.
+  // Our policy only needs the service to be ready, not its legacy method names.
+  mountModule(ctx, 'engineering', ['agentTeams'], {}, statuses, async ready => {
     await ready.plugin(engineering, {
       teamTools: !globalTeamTools,
       rolesEnabled: () => config.rolesEnabled.get(),
