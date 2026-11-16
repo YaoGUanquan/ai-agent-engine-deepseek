@@ -6,6 +6,7 @@ import { mkdir, readFile, realpath, rename, rm, unlink, writeFile } from 'node:f
 import { homedir } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { ensureDesktopRuntime, DesktopRuntimeError, type DesktopRuntimeProfile } from './desktop-runtime.ts'
 import type {
   CheckoutUpdateStage,
   RuntimeSupport,
@@ -45,7 +46,7 @@ interface PluginManifest {
   dsh?: { compatibility?: { verifiedThrough?: string; verifiedRuntimes?: readonly string[] } }
 }
 
-interface ProfileContextLike {
+interface ProfileContextLike extends DesktopRuntimeProfile {
   dir?: string
   home?: string
   installAnchor?: string
@@ -146,7 +147,9 @@ function executable(command: string): string {
 /**
  * Host-owned updater for this plugin.
  *
- * It never edits Harness or another plugin. Two channels are supported: a
+ * It preserves Harness code and other plugins. On affected Windows installs,
+ * an owner-requested update may restore a missing runtime directory mapping.
+ * Two channels are supported: a
  * package install (download the release tarball, then let the Host plugin
  * manager install it) and a git checkout (build an isolated pinned target,
  * fast-forward, then activate whole output/dependency trees). Package installs
@@ -441,8 +444,13 @@ export class UpdateService extends TypertRemoteService {
     this.phase = 'installing'
     this.message = 'installing'
     try {
+      const runtimeRepaired = await ensureDesktopRuntime(this.profile())
       // Do not pass approvedBuilds: only a separate user-approved Host operation can authorize them.
       this.installResult = installResultOf(await manager.installBundle(target, { saveExact: true, enabled: true }))
+      if (runtimeRepaired) this.installResult = {
+        ...this.installResult,
+        warnings: [...this.installResult.warnings ?? [], 'Restored the missing Desktop runtime path using the existing local runtime.'],
+      }
       const result = this.installResult
       if (result.application !== 'applied' && result.application !== 'restart-required') {
         const detail = result.error?.diagnostic || result.packageResult?.output || `Host installation outcome: ${result.application}.`
@@ -453,6 +461,7 @@ export class UpdateService extends TypertRemoteService {
       }
       return result.application === 'restart-required'
     } catch (error) {
+      if (error instanceof DesktopRuntimeError) throw new Blocked('host-runtime-unavailable', error.message)
       if (error instanceof Blocked) throw error
       const detail = messageOf(error)
       throw new Blocked(/incompatible-version/i.test(detail) ? 'incompatible-version' : 'install-failed', detail)

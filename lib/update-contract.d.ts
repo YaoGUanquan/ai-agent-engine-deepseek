@@ -6,7 +6,7 @@
  */
 export type UpdateChannel = 'package' | 'checkout';
 export type UpdatePhase = 'idle' | 'checking' | 'downloading' | 'installing' | 'rebuilding' | 'applied' | 'failed';
-export type UpdateBlocked = 'busy' | 'no-plugin-manager' | 'no-release' | 'no-asset' | 'checksum-mismatch' | 'checksum-missing' | 'checksum-invalid' | 'package-identity-mismatch' | 'install-failed' | 'install-cancelled' | 'install-overridden' | 'checkout-changed' | 'build-failed' | 'activation-failed' | 'incompatible-version' | 'dirty-worktree' | 'no-upstream' | 'no-update';
+export type UpdateBlocked = 'busy' | 'no-plugin-manager' | 'host-runtime-unavailable' | 'no-release' | 'no-asset' | 'checksum-mismatch' | 'checksum-missing' | 'checksum-invalid' | 'package-identity-mismatch' | 'install-failed' | 'install-cancelled' | 'install-overridden' | 'checkout-changed' | 'build-failed' | 'activation-failed' | 'incompatible-version' | 'dirty-worktree' | 'no-upstream' | 'no-update';
 /** Whether this Host is a recorded runtime check or an untested version. */
 export type RuntimeSupport = 'verified' | 'untested-newer' | 'untested-older' | 'unknown';
 export interface UpdateReleaseView {

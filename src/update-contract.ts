@@ -12,6 +12,7 @@ export type UpdatePhase = 'idle' | 'checking' | 'downloading' | 'installing' | '
 export type UpdateBlocked =
   | 'busy'
   | 'no-plugin-manager'
+  | 'host-runtime-unavailable'
   | 'no-release'
   | 'no-asset'
   | 'checksum-mismatch'

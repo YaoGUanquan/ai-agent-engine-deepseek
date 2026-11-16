@@ -15,7 +15,9 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
 /**
  * Host-owned updater for this plugin.
  *
- * It never edits Harness or another plugin. Two channels are supported: a
+ * It preserves Harness code and other plugins. On affected Windows installs,
+ * an owner-requested update may restore a missing runtime directory mapping.
+ * Two channels are supported: a
  * package install (download the release tarball, then let the Host plugin
  * manager install it) and a git checkout (build an isolated pinned target,
  * fast-forward, then activate whole output/dependency trees). Package installs

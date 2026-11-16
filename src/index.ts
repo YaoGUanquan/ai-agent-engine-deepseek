@@ -71,7 +71,7 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
     'loader', 'agentPresets', 'agents', 'sessions', 'sessionPersistence',
     'sessionProjections', 'subagents', 'skills', 'typert', 'systemPrompt', 'tools',
   ], {
-    loader: ['entries'], agentPresets: ['readDocument', 'composedPreset'],
+    loader: ['entries'], agentPresets: ['readDocument', 'composedPreset', 'register'],
     agents: ['list', 'get'], skills: ['registerProvider'], systemPrompt: ['section'],
     tools: ['register'],
   }, statuses, scope => installEngineering(scope, config, statuses))
@@ -79,10 +79,9 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
 
 async function installEngineering(ctx: Context, config: Config, statuses: import('./module-runtime.ts').ModuleStatuses): Promise<false> {
   const [
-    { default: AgentPreset }, engineering,
+    engineering,
     { installSkills }, { entryListProblem }, { entryListSchema }, { load },
   ] = await Promise.all([
-    import('@deepseek-ai/dsh-agent-preset'),
     import('./engineering.ts'), import('./skills.ts'),
     import('@deepseek-ai/dsh-agent-preset-registry'),
     import('@deepseek-ai/cordis-plugin-include'), import('js-yaml'),
@@ -110,12 +109,12 @@ async function installEngineering(ctx: Context, config: Config, statuses: import
       rolesEnabled: () => config.rolesEnabled.get(),
       rolesPath: config.rolesPath,
     })
-    await ready.plugin(AgentPreset, {
+    await ready.effect(async () => ready.agentPresets.register({
       id: 'ai-agent-engine',
       name: 'AI Agent Engine',
       description: '按需组队的工程协作：需求、前后端实现与分层验证。',
       plugins: [...plugins as PresetDefinition['plugins']],
-    })
+    }), 'ai-agent-engine.preset()')
   })
   return false
 }

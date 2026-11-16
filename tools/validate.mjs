@@ -7,6 +7,8 @@ import semver from 'semver'
 const expected = ['ae-grill', 'ae-frontend', 'ae-backend', 'ae-unit-test', 'ae-integration-test', 'ae-e2e-test', 'ae-e2e-suite'].sort()
 assert.deepEqual(readdirSync('skills').sort(), expected)
 const pkg = JSON.parse(readFileSync('package.json', 'utf8'))
+// Installing a private copy shadows built-in preset rows on newer Hosts.
+assert.ok(!pkg.dependencies['@deepseek-ai/dsh-agent-preset'])
 const lock = JSON.parse(readFileSync('package-lock.json', 'utf8'))
 assert.equal(pkg.license, 'GPL-2.0-only')
 assert.equal(pkg.version, lock.version)

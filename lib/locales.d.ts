@@ -98,6 +98,7 @@ export declare const en: {
     readonly 'update.blocked.checksum-invalid': "The checksum file does not contain a valid digest for this package.";
     readonly 'update.blocked.package-identity-mismatch': "The package name or version does not match the selected release.";
     readonly 'update.blocked.install-failed': "The Host could not install the update. See the diagnostic below and retry.";
+    readonly 'update.blocked.host-runtime-unavailable': "The Desktop package manager runtime is missing or incomplete. Repair the Desktop installation, then retry.";
     readonly 'update.blocked.install-cancelled': "The Host cancelled the installation. No successful update was confirmed.";
     readonly 'update.blocked.install-overridden': "The installation is overridden by another configuration layer.";
     readonly 'update.blocked.checkout-changed': "The checkout changed during preparation. Check local changes before retrying.";

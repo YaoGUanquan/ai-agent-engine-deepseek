@@ -43,7 +43,7 @@ const state = z_strictObject({
   outdated: z_boolean(),
   canApply: z_boolean(),
   blocked: z_enum([
-    'busy', 'no-plugin-manager', 'no-release', 'no-asset', 'checksum-mismatch',
+    'busy', 'no-plugin-manager', 'host-runtime-unavailable', 'no-release', 'no-asset', 'checksum-mismatch',
     'incompatible-version', 'dirty-worktree', 'no-upstream', 'no-update',
     'checksum-missing', 'checksum-invalid', 'package-identity-mismatch',
     'install-failed', 'install-cancelled', 'install-overridden',

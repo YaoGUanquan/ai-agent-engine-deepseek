@@ -12,6 +12,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { UpdateStateView } from '../src/update-contract.ts'
 import { UpdateService } from '../src/update-service.ts'
 import { updateRpc } from '../src/update-rpc.ts'
+import * as desktopRuntime from '../src/desktop-runtime.ts'
 
 const codec = updateRpc.descriptors[0]!.result!
 if (codec.mode !== 'strict') throw new Error('Expected a strict update-state codec')
@@ -181,6 +182,47 @@ function checkoutService(root: string): { ctx: Context; service: UpdateService; 
 }
 
 describe('update service', () => {
+  it('reports runtime recovery failure without invoking the Host installer', async () => {
+    const fixture = await installFixture()
+    const recovery = vi.spyOn(desktopRuntime, 'ensureDesktopRuntime').mockRejectedValue(new desktopRuntime.DesktopRuntimeError('Repair Desktop and retry.'))
+    try {
+      await fixture.owner.check()
+      expect(recovery).not.toHaveBeenCalled()
+      await fixture.owner.apply()
+      const state = await settled(fixture.owner)
+      expect(state.blocked).toBe('host-runtime-unavailable')
+      expect(state.error).toBe('Repair Desktop and retry.')
+      expect(fixture.install).not.toHaveBeenCalled()
+      expect(codec.create().parse(state)).toEqual(state)
+    } finally { await fixture.ctx.fiber.dispose() }
+  })
+
+  it('recovers the runtime before installation and retains the recovery warning', async () => {
+    const fixture = await installFixture()
+    const recovery = vi.spyOn(desktopRuntime, 'ensureDesktopRuntime').mockResolvedValue(true)
+    fixture.install.mockImplementation(async () => {
+      expect(recovery).toHaveBeenCalledOnce()
+      return { changed: true, application: 'restart-required', warnings: ['Host warning'] }
+    })
+    try {
+      await fixture.owner.check()
+      await fixture.owner.apply()
+      const state = await settled(fixture.owner)
+      expect(state.phase).toBe('applied')
+      expect(state.installResult?.warnings).toEqual(['Host warning', expect.stringContaining('runtime path')])
+    } finally { await fixture.ctx.fiber.dispose() }
+  })
+
+  it('does not repair the runtime for an unverified update package', async () => {
+    const fixture = await installFixture({ checksum: 'mismatch' })
+    const recovery = vi.spyOn(desktopRuntime, 'ensureDesktopRuntime')
+    try {
+      await fixture.owner.check()
+      await fixture.owner.apply()
+      expect((await settled(fixture.owner)).blocked).toBe('checksum-mismatch')
+      expect(recovery).not.toHaveBeenCalled()
+    } finally { await fixture.ctx.fiber.dispose() }
+  })
   it.each([
     ['0.2.1-rc.5', 'verified'], ['0.2.2-rc.1', 'verified'],
     ['0.2.1-rc.6', 'untested-older'], ['0.2.2-rc.2', 'untested-newer'],

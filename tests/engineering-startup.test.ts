@@ -3,15 +3,15 @@ import { describe, expect, it, vi } from 'vitest'
 import { apply, type Config } from '../src/index.ts'
 
 const mocks = vi.hoisted(() => ({
-  legacyImport: vi.fn(), policy: vi.fn(), preset: vi.fn(),
+  legacyImport: vi.fn(), policy: vi.fn(), preset: vi.fn(), presetDispose: vi.fn(),
 }))
 vi.mock('@deepseek-ai/dsh-experimental-agent-team', () => {
   mocks.legacyImport()
   throw new Error('Legacy Team imports a removed subagent/internal export')
 })
-vi.mock('@deepseek-ai/dsh-agent-preset', () => ({
-  default: (_ctx: Context, config: unknown) => { mocks.preset(config) },
-}))
+vi.mock('@deepseek-ai/dsh-agent-preset', () => {
+  throw new Error('The plugin must not load a competing preset implementation')
+})
 vi.mock('../src/engineering.ts', async importOriginal => ({
   ...await importOriginal<typeof import('../src/engineering.ts')>(),
   apply: (_ctx: Context, config: unknown) => { mocks.policy(config) },
@@ -25,6 +25,7 @@ describe('engineering on Hosts with official Team modules', () => {
     mocks.legacyImport.mockClear()
     mocks.policy.mockClear()
     mocks.preset.mockClear()
+    mocks.presetDispose.mockClear()
     const ctx = new Context()
     const readDocument = vi.fn(async () => ({ content: '[]' }))
     const services = {
@@ -33,7 +34,10 @@ describe('engineering on Hosts with official Team modules', () => {
         { options: { name: `@deepseek-ai/dsh-${prefix}agent-team` }, disabled: false },
         { options: { name: `@deepseek-ai/dsh-${prefix}tool-agent-team` }, disabled: false },
       ] },
-      agentPresets: { readDocument, composedPreset: vi.fn() },
+      agentPresets: {
+        readDocument, composedPreset: vi.fn(),
+        register: vi.fn(async config => { mocks.preset(config); return mocks.presetDispose }),
+      },
       agents: { list: () => [], get: vi.fn() },
       sessions: {}, sessionPersistence: {}, sessionProjections: {}, subagents: {},
       skills: { registerProvider: vi.fn() },
@@ -58,5 +62,6 @@ describe('engineering on Hosts with official Team modules', () => {
       expect(mocks.preset).toHaveBeenCalledWith(expect.objectContaining({ id: 'ai-agent-engine' }))
       expect(mocks.legacyImport).not.toHaveBeenCalled()
     } finally { await ctx.fiber.dispose() }
+    expect(mocks.presetDispose).toHaveBeenCalledOnce()
   })
 })
