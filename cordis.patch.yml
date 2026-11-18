@@ -6,4 +6,4 @@
         conversationManagement: true
         maxMembers: 8
         rolesEnabled: true
-        rolesPath: ''
+        rolesPath: !!js dshHomePath('ai-agent-engine', 'roles.json')
