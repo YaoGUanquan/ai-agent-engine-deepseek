@@ -21,4 +21,14 @@ interface TeamPresentation {
 }
 /** Preserve reference identity between store reads, without rewriting host data. */
 export declare function createRolePresentation(translate: (key: RoleKey) => string): <T extends TeamPresentation>(team: T) => T;
+interface TeamTaskPresentation {
+    readonly tasks?: readonly {
+        readonly ownerName?: string;
+    }[];
+}
+/**
+ * Localize only the board's owner label. The shared task projection may not
+ * carry a members array, so this presentation leaves every other field intact.
+ */
+export declare function createTaskOwnerPresentation(translate: (key: RoleKey) => string): <T extends TeamTaskPresentation>(team: T) => T;
 export {};

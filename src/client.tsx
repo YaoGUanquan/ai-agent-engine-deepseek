@@ -17,7 +17,7 @@ import { createDeletionController } from './deletion-state.ts'
 import { en, zh, type LocaleKey } from './locales.ts'
 import { conversationManagementEnabled } from './module-config.ts'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
-import { installTeamPresentation } from './team-presentation.tsx'
+import { installTeamBoardOwnerLabels, installTeamPresentation } from './team-presentation.tsx'
 import { pluginRpc } from './rpc.ts'
 import { RolesSettingsPage } from './roles-settings.tsx'
 import type { RolesRemote } from './roles-contract.ts'
@@ -126,6 +126,7 @@ export async function apply(ctx: Context): Promise<void> {
         await scope.plugin(official)
       }
       installTeamPresentation(scope)
+      installTeamBoardOwnerLabels(scope)
     } catch (error) {
       console.warn('AI Agent Engine team interface unavailable:', error instanceof Error ? error.message : 'Unknown initialization error')
       throw error

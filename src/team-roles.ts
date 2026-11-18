@@ -44,3 +44,27 @@ export function createRolePresentation(translate: (key: RoleKey) => string) {
     return result
   }
 }
+
+interface TeamTaskPresentation {
+  readonly tasks?: readonly { readonly ownerName?: string }[]
+}
+
+/**
+ * Localize only the board's owner label. The shared task projection may not
+ * carry a members array, so this presentation leaves every other field intact.
+ */
+export function createTaskOwnerPresentation(translate: (key: RoleKey) => string) {
+  const cache = new WeakMap<object, object>()
+  return <T extends TeamTaskPresentation>(team: T): T => {
+    if (!Array.isArray(team.tasks)) return team
+    const cached = cache.get(team)
+    if (cached) return cached as T
+    const result = {
+      ...team,
+      tasks: team.tasks.map(task => task.ownerName === undefined
+        ? task : { ...task, ownerName: roleLabel(task.ownerName, translate) }),
+    } as T
+    cache.set(team, result)
+    return result
+  }
+}

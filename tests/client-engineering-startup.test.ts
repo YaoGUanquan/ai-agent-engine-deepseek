@@ -3,8 +3,11 @@ import { Context } from '@deepseek-ai/cordis'
 import { describe, expect, it, vi } from 'vitest'
 import { apply } from '../src/client.tsx'
 
-const mocks = vi.hoisted(() => ({ presentation: vi.fn(), legacyImport: vi.fn() }))
-vi.mock('../src/team-presentation.tsx', () => ({ installTeamPresentation: mocks.presentation }))
+const mocks = vi.hoisted(() => ({ presentation: vi.fn(), ownerLabels: vi.fn(), legacyImport: vi.fn() }))
+vi.mock('../src/team-presentation.tsx', () => ({
+  installTeamPresentation: mocks.presentation,
+  installTeamBoardOwnerLabels: mocks.ownerLabels,
+}))
 vi.mock('@deepseek-ai/dsh-experimental-client-ui-agent-team/client', () => {
   mocks.legacyImport()
   throw new Error('Legacy Team UI is incompatible with the current Host')
@@ -17,6 +20,7 @@ vi.mock('@deepseek-ai/dsh-client-ui-primitives', () => ({
 describe('engineering UI on Hosts with official Team modules', () => {
   it.each(['', 'experimental-'])('waits for configured %sTeam UI without loading legacy UI', async prefix => {
     mocks.presentation.mockClear()
+    mocks.ownerLabels.mockClear()
     mocks.legacyImport.mockClear()
     const ctx = new Context()
     const services = {
@@ -33,6 +37,7 @@ describe('engineering UI on Hosts with official Team modules', () => {
     try {
       await ctx.plugin(async scope => { await apply(scope) })
       await vi.waitFor(() => expect(mocks.presentation).toHaveBeenCalledOnce())
+      expect(mocks.ownerLabels).toHaveBeenCalledOnce()
       expect(mocks.legacyImport).not.toHaveBeenCalled()
     } finally { await ctx.fiber.dispose() }
   })

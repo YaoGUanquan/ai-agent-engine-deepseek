@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createRolePresentation, roleKeys, roleLabel } from '../src/team-roles.ts'
+import { createRolePresentation, createTaskOwnerPresentation, roleKeys, roleLabel } from '../src/team-roles.ts'
 import { en, zh } from '../src/locales.ts'
 
 describe('professional role presentation', () => {
@@ -33,5 +33,34 @@ describe('professional role presentation', () => {
     expect(team.members[0].name).toBe('backend')
     expect(team.tasks[0].ownerName).toBe('backend')
     expect(present(team)).toBe(displayed)
+  })
+
+  it('localizes task-board owner labels without requiring member data', () => {
+    type Task = { id: string; status: string; ownerName?: string; ownerId?: string }
+    const team = {
+      enabled: true,
+      tasks: [
+        { id: 'task-1', ownerName: 'backend', status: 'in_progress' },
+        { id: 'task-2', ownerName: 'frontend-2', status: 'pending' },
+        { id: 'task-3', ownerId: 'session-123', status: 'pending' },
+        { id: 'task-4', ownerName: 'reviewer/checker', status: 'pending' },
+      ] as Task[],
+    }
+    const present = createTaskOwnerPresentation(key => zh[key])
+    const displayed = present(team)
+    expect(displayed.tasks?.map(task => task.ownerName)).toEqual([
+      '后端工程师', '前端工程师 2', undefined, 'reviewer/checker',
+    ])
+    expect(displayed.enabled).toBe(true)
+    expect(displayed).not.toBe(team)
+    expect(displayed.tasks?.[2]).toBe(team.tasks[2])
+    expect(present(team)).toBe(displayed)
+    expect(team.tasks[0]!.ownerName).toBe('backend')
+  })
+
+  it('passes through a projection without a task list', () => {
+    const present = createTaskOwnerPresentation(key => zh[key])
+    const team = { enabled: false }
+    expect(present(team)).toBe(team)
   })
 })

@@ -163,7 +163,9 @@ describe('role catalog isolation', () => {
       expect(policy).toContain('| frontend | ae-frontend |')
       expect(policy).not.toContain('{{ROLE_IDS}}')
       expect(policy).not.toContain('{{ROLE_TABLE}}')
-      expect(policy).toContain('spawn_teammate')
+      expect(policy).toContain('`subagent`')
+      expect(policy).toContain('team_task_*')
+      expect(policy).not.toContain('spawn_teammate')
     }
     expect(policies[0]).toBe(policies[1])
     expect(policies[0]).toBe(policies[2])

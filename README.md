@@ -10,8 +10,8 @@
 
 | 功能 | 可以做什么 |
 | --- | --- |
-| 多角色协作 | 按任务需要创建前端、后端、需求分析和测试队友，支持并行工作、消息沟通和共享任务 |
-| 专业角色显示 | 团队面板和任务负责人显示“前端工程师”“后端工程师”等职责 |
+| 多角色协作 | 按任务需要创建前端、后端、需求分析和测试队友，支持并行工作与消息沟通；开启团队协作后由共享任务板跟踪进度 |
+| 专业角色显示 | 队友按“前端工程师”“后端工程师”等职责命名，Subagent 成员行显示职责描述，共享任务负责人显示中文职称 |
 | 七项工程技能 | 覆盖需求澄清、前后端开发、单元测试、集成测试和浏览器测试 |
 | 永久删除对话 | 从对话菜单删除主对话及其所属队友记录，同时清理对应的缓存和搜索索引 |
 | 可配置工程角色 | 本机 `$DSH_HOME/ai-agent-engine/roles.json` 覆盖/追加 Lead 策略；插件设置 **`settings.section`「工程角色」** 可可视化编辑 `skill`/`responsibility` 与自定义 id |
@@ -25,7 +25,7 @@
 
 | 项目 | 当前支持范围 |
 | --- | --- |
-| 插件版本 | `0.2.8` |
+| 插件版本 | `0.2.9` |
 | DeepSeek Harness（允许加载） | `>=0.2.1-rc.5`（只有下限） |
 | Windows 官方源码宿主 + Chromium 隔离验证 | `0.2.1-rc.5`、`0.2.2-rc.1` |
 | 当前 Desktop 运行时隔离冒烟 | Windows `0.2.2-rc.3`：宿主启动与 Chromium 插件状态页；未替换用户安装 |
@@ -37,9 +37,9 @@ Harness 升到 `0.2.2`、`1.0` 等更高版本时不再因版本号被判不兼�
 `dsh.compatibility.verifiedThrough` 记录最高实测宿主版本 `0.2.2-rc.1`；`verifiedRuntimes` 明确列出实际验证过的 `0.2.1-rc.5` 和 `0.2.2-rc.1`。未列出的版本会标注“未经实测”，不阻止加载，也不把两个实测点之间的所有版本当作已验证。
 运行依赖与 peer 仍固定在 rc.5 的库窗口 `>=0.2.1-rc.5 <0.2.2-0`；这与宿主实测版本分开记录，本轮没有自动升级插件依赖。
 基础加载协议、RPC 或模块导出发生破坏性变化时仍需更新插件；设置页的“插件状态”会指出具体哪一层不可用。
-已发布的旧标签（`v0.2.3` 及更早）安装包里写死的仍是旧的兼容范围与旧行为，
-要使用本次团队模块及预设依赖兼容修复，需安装 `ai-agent-engine-deepseek-0.2.8.tgz` 或更新构建，
-不能靠重新安装原有固定标签获得。`github:YaoGUanquan/ai-agent-engine-deepseek#v0.2.8` 仅在该标签正式发布后可用。
+已发布的旧标签（`v0.2.7` 及更早）安装包里写死的仍是旧的兼容范围与旧行为，
+要使用本次团队协作模式适配及 0.2.8 的预设/运行时修复，需安装 `ai-agent-engine-deepseek-0.2.9.tgz` 或更新构建，
+不能靠重新安装原有固定标签获得。`github:YaoGUanquan/ai-agent-engine-deepseek#v0.2.9` 仅在该标签正式发布后可用。
 
 ### 自动兼容与降级
 
@@ -65,7 +65,7 @@ Windows Desktop 的内置 pnpm 路径缺失时，0.2.8 起会在所有者点击�
 4. 完全退出并重新打开 Desktop。
 
 ```text
-github:YaoGUanquan/ai-agent-engine-deepseek#v0.2.8
+github:YaoGUanquan/ai-agent-engine-deepseek#v0.2.9
 ```
 
 已经安装旧版时，按下文的[更新步骤](#更新与回退)操作。
@@ -74,7 +74,7 @@ github:YaoGUanquan/ai-agent-engine-deepseek#v0.2.8
 
 ### 下载安装包
 
-也可以打开 [Releases](https://github.com/YaoGUanquan/ai-agent-engine-deepseek/releases/latest)，下载 `ai-agent-engine-deepseek-0.2.8.tgz`，在插件管理器的“包名或地址”中填写该文件的绝对路径，再安装、启用并重启。
+也可以打开 [Releases](https://github.com/YaoGUanquan/ai-agent-engine-deepseek/releases/latest)，下载 `ai-agent-engine-deepseek-0.2.9.tgz`，在插件管理器的“包名或地址”中填写该文件的绝对路径，再安装、启用并重启。
 
 每个 Release 都提供版本说明、兼容范围和 `SHA256SUMS.txt` 校验文件。普通用户选择 `.tgz` 插件包即可；GitHub 自动生成的 “Source code” 是源码归档，供开发者使用。
 
@@ -106,7 +106,7 @@ github:YaoGUanquan/ai-agent-engine-deepseek#v0.2.8
 `dsh.compatibility.verifiedThrough` 记录的版本是实测基线；Harness 更新后即使版本号超出该基线，
 插件仍会加载，设置页标注“未经实测”，不会静默禁用。
 
-安装地址中的 `#v0.2.8` 表示固定版本。重新启动 Desktop 本身不会自动变成未来的新版本；
+安装地址中的 `#v0.2.9` 表示固定版本。重新启动 Desktop 本身不会自动变成未来的新版本；
 自动更新只发生在你点击“立即更新”之后。
 
 检出更新会把未完成的目标和阶段保存在该检出的 Git 元数据目录中。依赖安装、构建或产物替换失败后，设置页保留原因并允许继续剩余步骤；重启后也能读取待完成任务。准备过程不改变原有依赖和产物，替换前再次检查分支、HEAD 和本地改动。旧的依赖及产物目录保留为备份，不自动重置源码或删除用户未跟踪文件。依赖安装使用 `--ignore-scripts`，只显式执行插件构建脚本。
@@ -126,7 +126,7 @@ github:YaoGUanquan/ai-agent-engine-deepseek#v0.2.8
 例如，从 `0.2.1` 升级到当前版本时填写：
 
 ```text
-github:YaoGUanquan/ai-agent-engine-deepseek#v0.2.8
+github:YaoGUanquan/ai-agent-engine-deepseek#v0.2.9
 ```
 
 卸载插件不会替你删除已有对话。更新期间也不需要移除 Harness 的会话目录、记忆或项目文件。
@@ -138,7 +138,7 @@ github:YaoGUanquan/ai-agent-engine-deepseek#v0.2.8
 3. 重启后，在 **插件** 页打开 `ai-agent-engine-deepseek`，核对版本、安装来源和启用状态。
 4. 打开原有对话，确认历史仍可查看；已有自定义配置也应重新核对。
 
-插件版本 `0.2.8` 与 Harness 版本 `0.2.1-rc.5` 是两个不同的版本号。更新插件不会替你升级或替换 Desktop。
+插件版本 `0.2.9` 与 Harness 版本 `0.2.1-rc.5` 是两个不同的版本号。更新插件不会替你升级或替换 Desktop。
 
 如果重启后仍显示旧版，请先确认卸载、安装操作发生在当前正在使用的 Desktop 中，再检查是否还有旧的后台实例。只下载 `.tgz` 或只打开 Release 页面不会更新已安装插件。
 
@@ -163,7 +163,9 @@ github:YaoGUanquan/ai-agent-engine-deepseek#v0.2.2
 先确认接口和验收标准，完成后由测试工程师验证。
 ```
 
-助手会根据任务组织协作。点击会话顶部的“智能体团队”可以查看成员和共享任务，团队面板按职责显示名称。
+是否启用团队协作由根会话的 **模型与推理等级** 菜单控制。打开 **启用智能体团队协作** 后，宿主会提供共享任务工具，会话顶部的 Subagent 入口同时显示成员树和共享任务板；新会话默认关闭，关闭时不会创建共享任务。
+
+开启后，助手会根据任务组织协作：队友用 `subagent` 创建并按职责命名，成员行显示职责描述，共享任务由任务板跟踪，任务负责人显示中文职称。关闭时仍可用普通子代理分派独立任务，但进度由主对话自己跟踪。
 
 需要明确验证组队功能时，可以这样提问：
 
@@ -251,7 +253,7 @@ github:YaoGUanquan/ai-agent-engine-deepseek#v0.2.2
 
 ### 能在设置页里可视化编辑角色吗？
 
-可以。打开宿主**设置**，在本插件的 **`settings.section`「工程角色」** 中编辑。可改 `skill`（技能）与 `responsibility`（职责），可添加自定义角色 id，可「恢复默认」。团队面板中文职称仍由 locales 决定，本页不改展示名。
+可以。打开宿主**设置**，在本插件的 **`settings.section`「工程角色」** 中编辑。可改 `skill`（技能）与 `responsibility`（职责），可添加自定义角色 id，可「恢复默认」。成员行显示派发时写入的职责描述，任务板负责人按角色 id 显示中文职称；本页只改角色策略，不改展示名。
 
 也可以继续手改 `$DSH_HOME/ai-agent-engine/roles.json`（或 `rolesPath`）；设置页与文件读写**同一份** overlay。保存后 Lead 策略会重建，**新创建**的队友生效；已 spawn 队友不重绑。
 
@@ -267,7 +269,8 @@ github:YaoGUanquan/ai-agent-engine-deepseek#v0.2.2
 
 ### 当前版本验证过哪些功能？
 
-当前源码通过 `npm run check:all`：Host/Client 类型检查、公开资源校验、25 个文件的 155 项测试及构建。本轮官方 rc.5 源码宿主/Chromium 完整隔离回归 10 项通过。当前 Desktop 内置 0.2.2-rc.3 运行时使用实际安装包与本机依赖覆盖配置对比验证：0.2.7 可复现预设列表为空和工程协作失败；独立安装 0.2.8、以及在 0.2.7 安装目录直接升级到 0.2.8 后，标准/工程预设均注册成功，四个模块的宿主与界面均可用。0.2.2-rc.1 的完整回归为此前 0.2.6 的历史记录；本轮未重新运行该版本。
+当前源码通过 `npm run check:all`：Host/Client 类型检查、公开资源校验、27 个文件的 163 项测试及构建。本轮官方 rc.5 源码宿主/Chromium 完整隔离回归 10 项通过。当前 Desktop 内置 0.2.2-rc.3 运行时使用实际安装包与本机依赖覆盖配置对比验证：0.2.7 可复现预设列表为空和工程协作失败；独立安装 0.2.8、以及在 0.2.7 安装目录直接升级到 0.2.8 后，标准/工程预设均注册成功，四个模块的宿主与界面均可用。0.2.2-rc.1 的完整回归为此前 0.2.6 的历史记录；本轮未重新运行该版本。
+0.2.9 对齐 Lead 协作策略与任务板职称展示，并以 8 项新增测试覆盖策略契约与投影映射；未在真实模型会话中重新启用“启用智能体团队协作”跑完整组队流程，不能把测试当作该层验收。
 
 完整隔离回归使用合成会话和 MockAdapter，rc.3 仅验证启动和状态页；本轮没有调用付费模型、删除既有用户历史或更新当前 Desktop 安装。真实模型与原版 Desktop 的历史验收证据保留在验收记录中；其他平台、任意模型及完整多对话真实模型回归仍未重新验证。
 
@@ -285,7 +288,7 @@ npm run check:all
 npm pack
 ```
 
-构建后可在 Desktop 插件管理器中安装生成的 `ai-agent-engine-deepseek-0.2.8.tgz`。提交源码变更时应同步构建产物 `lib/`，保证 Git 地址安装可直接使用。
+构建后可在 Desktop 插件管理器中安装生成的 `ai-agent-engine-deepseek-0.2.9.tgz`。提交源码变更时应同步构建产物 `lib/`，保证 Git 地址安装可直接使用。
 
 使用未修改的官方 Harness `dsh-v0.2.1-rc.5` 或 `dsh-v0.2.2-rc.1` 源码完成其声明的依赖安装和完整构建后运行集成验收。入口检查 `engines.dsh` 下限，版本门禁放行不等于运行验证；生成目录和截图可通过 `AE_HARNESS_TEST_DIR`、`AE_HARNESS_OUTPUT_ROOT` 外置：
 
@@ -327,7 +330,7 @@ Host 通过 `aeRoles`（`getCatalog` / `getOverlay` / `putOverlay` / `restoreDef
 - **默认路径**：`$DSH_HOME/ai-agent-engine/roles.json`（`$DSH_HOME` 为 Harness 用户数据根）
 - **可选路径**：配置 `rolesPath` 为绝对路径（修改后需重新加载插件；`rolesEnabled` 为 volatile，可实时开关）
 - **不要**把角色文件放进工作区 `.ai-agent-engine/`（该目录仍仅用于删除记录 journal）
-- **可覆盖字段**：仅 `skill`、`responsibility`（按角色 `id`）。团队面板中文职称仍由 locales 决定，**不**改 UI 展示名
+- **可覆盖字段**：仅 `skill`、`responsibility`（按角色 `id`）。成员行显示派发时写入的职责描述，任务板负责人按角色 id 显示中文职称；本页/文件**不**改 UI 展示名
 - **合并**：按 `id` 深合并到包内 builtin 种子；只覆盖文件中出现的字段；未知 `id` 追加。插件升级后，内置文案随包刷新，未在 overlay 中出现的字段跟随新种子
 - **多对话**：并发目录解析和策略刷新有回归；完整多对话真实模型用例尚未重新验证，不能把单元测试或同团队并发等同于该层验收
 
